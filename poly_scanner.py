@@ -10,8 +10,11 @@ from ws_client import poly_ws
 poly = PolyClient()
 
 def parse_p(p_str):
-    """Convert Polymarket cents (ints/strings) to dollars."""
-    try: return float(p_str) / 100.0
+    """Convert Polymarket price (cents or dollars) to decimal (0-1)."""
+    try:
+        val = float(p_str)
+        if val > 1.0: return val / 100.0
+        return val
     except: return None
 
 def calculate_kelly_size(profit_pct):
@@ -158,10 +161,7 @@ def main():
             print(f"[{datetime.now().strftime('%H:%M:%S')}] Monitoring {len(p_active)} Polymarket events...")
             
             for market in p_active:
-                # Pass first clob token ID as asset_id proxy for cache check
-                token_ids = market.get('clobTokenIds')
-                asset_id = token_ids[0] if token_ids else None
-                ob = poly.get_orderbook(market['id'], asset_id=asset_id)
+                ob = poly.get_market_orderbooks(market)
                 if ob:
                     check_internal_arbitrage(market, ob)
             

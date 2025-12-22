@@ -39,43 +39,21 @@ class BacktestEngine:
             for tid in token_ids:
                 all_token_tasks.append((m, tid))
 
-        print(f"  - Fetching {len(all_token_tasks)} orderbooks for {len(p_active)} Poly markets...")
-        
-        token_to_ob = {}
+        print(f"  - Fetching orderbooks for {len(p_active)} Poly markets using parallel threads...")
         with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
-            future_to_tid = {executor.submit(self.poly.get_orderbook, tid): tid for _, tid in all_token_tasks}
+            future_to_market = {executor.submit(self.poly.get_market_orderbooks, m): m for m in p_active}
             
-            count = 0
-            for future in concurrent.futures.as_completed(future_to_tid):
-                count += 1
-                tid = future_to_tid[future]
+            for future in concurrent.futures.as_completed(future_to_market):
+                market = future_to_market[future]
                 try:
-                    ob = future.result()
-                    if ob: token_to_ob[tid] = ob
+                    market_obs = future.result()
+                    if market_obs:
+                        snapshot["poly_markets"].append({
+                            "market": market,
+                            "orderbook": market_obs
+                        })
                 except: pass
                 
-                if count % 20 == 0 or count == len(all_token_tasks):
-                    print(f"    Progress: {count}/{len(all_token_tasks)}...", end='\r', flush=True)
-
-        # Re-assemble into snapshots
-        for m in p_active:
-            token_ids = json.loads(m.get('clobTokenIds', '[]'))
-            outcomes = m.get('outcomes', [])
-            
-            market_obs = {}
-            # Map common names to YES/NO for binary logic
-            if len(token_ids) == 2:
-                market_obs['yes'] = token_to_ob.get(token_ids[0])
-                market_obs['no'] = token_to_ob.get(token_ids[1])
-            
-            # Also store with token_ids as keys for multi-outcome
-            market_obs['tokens'] = {tid: token_to_ob.get(tid) for tid in token_ids}
-            
-            snapshot["poly_markets"].append({
-                "market": m,
-                "orderbook": market_obs
-            })
-
         print(f"\n  - Poly Snapshot Complete: {len(snapshot['poly_markets'])} markets captured.")
         print(f"  - Kalshi: {len(snapshot['kalshi_markets'])} markets")
         return snapshot

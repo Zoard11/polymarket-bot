@@ -31,7 +31,10 @@ def load_manual_mapping():
     except: return {}
 
 def parse_p(p_str):
-    try: return float(p_str) / 100.0
+    try:
+        val = float(p_str)
+        if val > 1.0: return val / 100.0
+        return val
     except: return None
 
 def calculate_kelly_size(profit_pct):
@@ -167,7 +170,7 @@ def main():
 
             print(f"[{datetime.now().strftime('%H:%M:%S')}] Monitoring {len(p_active)} Poly vs {len(k_active)} Kalshi...")
             for market in p_active:
-                ob = poly.get_orderbook(market['id'])
+                ob = poly.get_market_orderbooks(market)
                 if not ob: continue
                 k_match = find_kalshi_match_semantic(market, k_active, k_embeddings, mapping)
                 if k_match: check_cross_platform_arb(market, ob, k_match)
