@@ -151,12 +151,20 @@ def check_cross_platform_arb(poly_market, poly_ob, kalshi_market):
 
 def print_alert(type_name, q, total, profit, slug, details=None):
     icon = "🔥" if "CROSS" not in type_name else "🌐"
-    print(f"\n[{datetime.now().strftime('%H:%M:%S')}] {icon} {type_name} ARBITRAGE FOUND!")
-    print(f"Market: {q}")
-    if details: print(f"Details: {', '.join(details)}")
-    print(f"Total Cost: ${total:.3f} | Profit: {profit:.2f}%")
-    print(f"Link: https://polymarket.com/event/{slug}")
-    print("-" * 60)
+    alert_text = f"\n[{datetime.now().strftime('%H:%M:%S')}] {icon} {type_name} ARBITRAGE FOUND!\n"
+    alert_text += f"Market: {q}\n"
+    if details: alert_text += f"Details: {', '.join(details)}\n"
+    alert_text += f"Total Cost: ${total:.3f} | Profit: {profit:.2f}%\n"
+    alert_text += f"Link: https://polymarket.com/event/{slug}\n"
+    alert_text += "-" * 60 + "\n"
+    
+    print(alert_text)
+    
+    # Log to persistent opportunities file
+    try:
+        with open('opportunities.log', 'a', encoding='utf-8') as f:
+            f.write(alert_text)
+    except: pass
 
 def main():
     parser = argparse.ArgumentParser(description="Polymarket & Kalshi NLP Arbitrage Scanner")

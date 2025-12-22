@@ -1,68 +1,69 @@
-# Polymarket & Kalshi Arbitrage Scanner Bot
+# Arbitrage Scanner Bot Suite 🦅
 
-A real-time scanner for identifying "Pure Arbitrage" (Polymarket) and "Cross-Platform Arbitrage" (Polymarket vs Kalshi) opportunities.
+Two separate bots for finding risk-free profit opportunities on prediction markets.
 
-## 🚀 Overview
+## 1. Pure Polymarket Scanner (`poly_scanner.py`)
+Focuses exclusively on arbitrage opportunities **within** Polymarket.
+- **Binary Dutch Book**: `YES Ask + NO Ask < $1.00`.
+- **Multi-Outcome**: `Sum(All Outcome YES Asks) < $1.00`.
+- **Speed**: Optimized for fast polling (no NLP overhead).
 
-This bot monitors high-volume markets on Polymarket and Kalshi to find risk-free profit opportunities:
-1. **Dutch Book Arbitrage**: Combined price of YES and NO shares on Polymarket is < $1.00.
-2. **Multi-Outcome Arbitrage**: Sum of all outcomes in a categorical market is < $1.00.
-3. **Cross-Platform Arbitrage**: Price discrepancy between Polymarket and Kalshi for the same event (e.g. Poly YES + Kalshi NO < $1.00).
+**How to run:**
+```bash
+# Local
+python poly_scanner.py
 
-### How it works
-1. **Fetch Markets**: Retrieves the top active markets sorted by 24h volume.
-2. **Filter**: Focuses on markets with sufficient liquidity and volume.
-3. **Order Book Scan**: Fetches real **Ask prices** and checks available **Size** (min $100).
-4. **Arbitrage Calculation**: If `Sum(Asks) < $0.99`, it signals a profit opportunity.
+# Local (Single check)
+python poly_scanner.py --once
+```
 
-## 💻 Usage
+---
 
-### Local Setup
-1. **Clone the repo**
-2. **Install dependencies**: `pip install -r requirements.txt`
-3. **Run the scanner**:
-   - **Single Scan (Test Mode)**: `python scanner.py --once`
-   - **Continuous Mode**: `python scanner.py`
+## 2. Cross-Platform NLP Scanner (`cross_scanner.py`)
+The advanced version that finds price discrepancies **between** Polymarket and Kalshi.
+- **NLP Matching**: Uses `SentenceTransformers` to match questions across sites automatically (No manual mapping needed!).
+- **Inter-site Profit**: Checks `Poly(YES) + Kalshi(NO)` and vice-versa.
+- **Logic**: Intelligent semantic comparison with a high confidence threshold (0.82+).
 
-### Configuration
-Adjust constants in `scanner.py`:
-- `MIN_PROFIT_PCT`: Margin threshold (default 1.0%).
-- `MIN_VOLUME_24H`: Daily volume floor (default $10,000).
-- `MIN_LIQUIDITY_USD`: Min dollar value required at the best price.
+**How to run:**
+```bash
+# Local (Requires sentence-transformers and torch)
+python cross_scanner.py
+```
 
 ---
 
 ## ☁️ Oracle Cloud VM Deployment (92.5.20.42)
 
-### 1. Connect via SSH
-Ensure your private key is in the local `~/.ssh` directory.
+### 1. Update/Deploy via Git
 ```bash
-ssh -i ~/.ssh/ssh-key-2025-12-22.key ubuntu@92.5.20.42
+# On your local machine
+git add .
+git commit -m "Separate projects: Pure Poly and Cross NLP"
+git push
+
+# On the VM
+ssh -i ./ssh/ssh-key-2025-12-22.key opc@92.5.20.42
+cd ~/polymarket-bot && git pull
 ```
 
-### 2. Copy Files to the VM
-Run from your **local machine**:
+### 2. Run Both Bots in Background
+You can run both simultaneously using these commands on the VM:
 ```bash
-scp -i ~/.ssh/ssh-key-2025-12-22.key -r ./* ubuntu@92.5.20.42:~/polymarket-bot/
+# Start Polymarket-only bot
+nohup ./venv/bin/python3 -u poly_scanner.py > poly.log 2>&1 &
+
+# Start Cross-platform NLP bot
+nohup ./venv/bin/python3 -u cross_scanner.py > cross.log 2>&1 &
 ```
 
-### 3. Setup & Run on VM
-```bash
-cd ~/polymarket-bot/
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-python3 scanner.py
-```
-
-### 4. Run in Background
-Keep the bot alive after closing SSH:
-```bash
-nohup python3 scanner.py > bot.log 2>&1 &
-```
-*View logs:* `tail -f bot.log`
+### 3. Monitoring
+Check progress in real-time:
+*   `tail -f poly.log` (Internal arbs)
+*   `tail -f cross.log` (Cross-platform arbs)
 
 ---
 
-## ⚠️ Disclaimer
-This bot is a **scanner only**. It identifies opportunities but does not execute trades. Use at your own risk.
+## ⚠️ Requirements
+- `requests`, `python-dotenv` (Both)
+- `sentence-transformers`, `torch` (Cross-scanner only)
