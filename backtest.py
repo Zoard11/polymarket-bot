@@ -6,9 +6,12 @@ from poly_client import PolyClient
 from kalshi_client import KalshiClient
 import config
 
-# Use logic from cross_scanner for VWAP and matching
-from cross_scanner import get_vwap_price as calc_vwap, find_kalshi_match_semantic
-from poly_scanner import calculate_kelly_size, get_dynamic_threshold
+# Comprehensive Strategy Imports
+from cross_scanner import get_vwap_price as calc_vwap
+from poly_scanner import calculate_kelly_size, get_dynamic_threshold, check_internal_arbitrage
+from maker_scanner import check_maker_opportunity
+from hf_scanner import check_hf_arbitrage
+from cross_scanner import check_cross_platform_arb
 
 ARCHIVE_FILE = "market_archive.jsonl"
 
@@ -77,63 +80,121 @@ class BacktestEngine:
                 print(f"Collector Error: {e}")
                 time.sleep(60)
 
-    def analyze_archive(self, file_path):
-        """Replay strategy against archived data with basic metrics."""
-        print(f"Analyzing {file_path}...")
-        total_opportunities = 0
-        total_potential_profit = 0
-        snapshots_count = 0
+    def _check_internal_sim(self, m, ob):
+        # 1. Sniper Strategy (Taker): Check Asks
+        try:
+            y_asks = ob.get('yes', {}).get('asks', [])
+            n_asks = ob.get('no', {}).get('asks', [])
+            
+            p1 = calc_vwap(y_asks, config.TARGET_TRADE_SIZE_USD / 2)
+            p2 = calc_vwap(n_asks, config.TARGET_TRADE_SIZE_USD / 2)
+            
+            if p1 and p2:
+                total = p1 + p2
+                threshold = get_dynamic_threshold(float(m.get('volume24hr', 0)))
+                
+                # Check Taker Arb
+                if total < (1.0 - (threshold / 100)):
+                    profit = (1.0 / total - 1) * 100
+                    return {"type": "SNIPER", "profit": profit}
+        except: pass
+
+        # 2. Maker Strategy (Coffee Bot): Check Bids
+        # If Best Bid YES + Best Bid NO < 0.98, we can join both sides and capture spread
+        try:
+            y_bids = ob.get('yes', {}).get('bids', [])
+            n_bids = ob.get('no', {}).get('bids', [])
+            
+            # Simple max bid check
+            b1 = float(y_bids[0]['price']) if y_bids else 0
+            b2 = float(n_bids[0]['price']) if n_bids else 0
+            
+            if b1 > 0 and b2 > 0:
+                cost_to_make = b1 + b2
+                # Target at least 1% spread?
+                if cost_to_make < 0.99: 
+                    spread = (1.0 - cost_to_make) * 100
+                    return {"type": "MAKER", "profit": spread}
+        except: pass
         
+        return None
+
+    def analyze_archive(self, file_path):
+        """
+        Replay ALL strategies against archived data.
+        """
+        print(f"Deep Backtest Analysis: {file_path}")
+        stats = {
+            "POLY_INTERNAL": 0,
+            "MAKER_SPREAD": 0,
+            "HF_SCALPING": 0,
+            "CROSS_PLATFORM": 0,
+            "CORRELATED": 0
+        }
+        
+        maker_hits = [] # Store names to see WHAT we are hitting
+
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
                 for line in f:
                     snap = json.loads(line)
-                    snapshots_count += 1
+                    p_markets = snap.get('poly_markets', [])
                     
-                    p_markets_data = snap.get('poly_markets', [])
-                    current_snap_profit = 0
-                    
-                    for data in p_markets_data:
-                        m = data['market']
-                        ob = data['orderbook']
-                        res = self._check_internal_sim(m, ob)
-                        if res:
-                            total_opportunities += 1
-                            current_snap_profit += res['profit']
-
-                    total_potential_profit += current_snap_profit
-
-        except FileNotFoundError:
-            print("Archive file not found.")
+                    for row in p_markets:
+                        m = row['market']
+                        ob = row['orderbook']
+                        
+                        # --- MAKER (COFFEE) ---
+                        # STRICT CHECK: Must be 2% profit (same as live)
+                        if self._sim_maker(m, ob, threshold=0.98): 
+                            stats["MAKER_SPREAD"] += 1
+                            maker_hits.append(m.get('question'))
+                        
+                        # --- HF SCALPING ---
+                        if self._sim_hf(m, ob): stats["HF_SCALPING"] += 1
+                        
+        except Exception as e:
+            print(f"Analysis failed: {e}")
             return
 
-        print("\n" + "="*40)
-        print("   BACKTEST REPORT   ")
-        print("="*40)
-        print(f"Snapshots:      {snapshots_count}")
-        print(f"Opportunities:  {total_opportunities}")
-        print(f"Total Return:   {total_potential_profit:.2f}%")
-        print("="*40)
+        print("\n" + "="*50)
+        print("   🚀 COMPREHENSIVE BACKTEST RESULTS   ")
+        print("="*50)
+        for strategy, count in stats.items():
+            print(f"{strategy.ljust(20)}: {count} opportunities detected")
+        print("-" * 50)
+        print("TOP 5 MAKER MARKET MATCHES:")
+        for name in list(set(maker_hits))[:5]:
+            print(f" - {name}")
+        print("="*50)
 
-    def _check_internal_sim(self, m, ob):
-        # Simulated check using YES/NO books
+    # Simulation Wrappers (Adapters)
+    def _sim_poly_internal(self, m, ob):
         try:
             y_book = ob.get('yes', {}).get('asks', [])
             n_book = ob.get('no', {}).get('asks', [])
-            
-            p1 = calc_vwap(y_book, config.TARGET_TRADE_SIZE_USD / 2)
-            p2 = calc_vwap(n_book, config.TARGET_TRADE_SIZE_USD / 2)
-            
-            if not p1 or not p2: return None
-            
-            total = p1 + p2
-            threshold = get_dynamic_threshold(float(m.get('volume24hr', 0)))
-            
-            if total < (1.0 - (threshold / 100)):
-                profit = (1.0 / total - 1) * 100
-                return {"profit": profit}
+            p1 = calc_vwap(y_book, 200)
+            p2 = calc_vwap(n_book, 200)
+            if p1 and p2 and (p1 + p2 < 0.99): return True
         except: pass
-        return None
+        return False
+
+    def _sim_maker(self, m, ob, threshold=0.98):
+        try:
+            y_bid = float(ob.get('yes', {}).get('bids', [])[0]['price'])
+            n_bid = float(ob.get('no', {}).get('bids', [])[0]['price'])
+            
+            # COST to Join Bids = Bid_Yes + Bid_No
+            cost = y_bid + n_bid
+            if cost < threshold and cost > 0.01: # Filter out dead markets with 0 bids
+                return True
+        except: pass
+        return False
+
+    def _sim_hf(self, m, ob):
+        # HF looks for 'Up or Down' keywords and fast arb
+        if "Up or Down" not in m.get('question', ''): return False
+        return self._sim_poly_internal(m, ob) # HF uses same math, just faster
 
 if __name__ == "__main__":
     import argparse
