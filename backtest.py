@@ -43,6 +43,14 @@ class BacktestEngine:
     def run_collector(self, interval_sec=300):
         """Continuously collect data and append to jsonl file."""
         print(f"Data Collector started. Saving to {ARCHIVE_FILE}. Interval: {interval_sec}s")
+        
+        # Ensure file exists immediately for easier health checks
+        try:
+            with open(ARCHIVE_FILE, 'a', encoding='utf-8') as f:
+                pass
+        except Exception as e:
+            print(f"Initial file creation failed: {e}")
+
         while True:
             try:
                 snap = self.collect_snapshot()
