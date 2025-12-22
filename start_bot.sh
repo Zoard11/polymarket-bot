@@ -35,8 +35,8 @@ echo "[1/1] Launching Maker Strategy Scanner (General) with Trading..."
 nohup ./venv/bin/python3 -u maker_scanner_general.py > maker_gen.log 2>&1 &
 
 # Data Collector for Backtesting - DISABLED (Not needed for live trading)
-# echo "[7/7] Launching Backtest Data Collector..."
-# nohup ./venv/bin/python3 -u backtest.py --collect --interval 300 > backtest_collector.log 2>&1 &
+echo "[7/7] Launching Backtest Data Collector..."
+nohup ./venv/bin/python3 -u backtest.py --collect --interval 300 > backtest_collector.log 2>&1 &
 
 echo "--------------------------------------------------"
 echo "✅ All bots are running in the background."
