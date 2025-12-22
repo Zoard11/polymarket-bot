@@ -56,26 +56,58 @@ def check_arbitrage(market, ob):
     # Use Gamma Orderbook structure
     yes = ob.get('yes', [])
     no = ob.get('no', [])
+    outcomes = ob.get('outcomes', [])
 
-    # We need the lowest Ask for YES and lowest Ask for NO
-    # If YES Ask + NO Ask < 1.0, there is an arbitrage opportunity
-    try:
-        y_ask = float(yes[0]['price']) if yes else None
-        n_ask = float(no[0]['price']) if no else None
-        
-        if y_ask and n_ask:
-            total = y_ask + n_ask
-            if total < 1 - (MIN_PROFIT_PCT / 100):
-                profit_pct = (1 - total) * 100
-                print_arbitrage(question, "YES", y_ask, "NO", n_ask, total, profit_pct, slug)
-    except Exception as e:
-        pass
+    # Scenario 1: Binary market (YES/NO)
+    if (yes or no) and not outcomes:
+        try:
+            y_ask = float(yes[0]['price']) if yes else None
+            n_ask = float(no[0]['price']) if no else None
+            
+            if y_ask and n_ask:
+                total = y_ask + n_ask
+                if total < 1 - (MIN_PROFIT_PCT / 100):
+                    profit_pct = (1 - total) * 100
+                    print_arbitrage(question, "YES + NO", total, profit_pct, slug)
+        except Exception:
+            pass
+            
+    # Scenario 2: Multi-outcome market (Categorical)
+    elif outcomes:
+        try:
+            total_sum = 0
+            details = []
+            
+            # Polymarket categorical markets: sum of YES for all outcomes must be 1.0
+            for outcome in outcomes:
+                # In Gamma orderbook, each outcome has its own 'bids' and 'asks'
+                asks = outcome.get('asks', [])
+                if asks:
+                    price = float(asks[0]['price'])
+                    total_sum += price
+                    details.append(f"{outcome.get('name')}: {price:.3f}")
+                else:
+                    # If any outcome is missing an ask price, we can't guarantee arbitrage
+                    return
+            
+            if total_sum < 1 - (MIN_PROFIT_PCT / 100):
+                profit_pct = (1 - total_sum) * 100
+                print_multi_arbitrage(question, total_sum, profit_pct, details, slug)
+        except Exception:
+            pass
 
-def print_arbitrage(q, side1, p1, side2, p2, total, profit, slug):
-    print(f"\n[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] ARBITRAGE FOUND!")
+def print_arbitrage(q, type_name, total, profit, slug):
+    print(f"\n[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] 🔥 ARBITRAGE FOUND ({type_name})!")
     print(f"Market: {q}")
-    print(f"Buy {side1} @ ${p1:.4f} + Buy {side2} @ ${p2:.4f} = ${total:.4f}")
-    print(f"Profit: {profit:.2f}%")
+    print(f"Total Cost: ${total:.3f} | Potential Profit: {profit:.2f}%")
+    print(f"Link: https://polymarket.com/event/{slug}")
+    print("-" * 60)
+
+def print_multi_arbitrage(q, total, profit, details, slug):
+    print(f"\n[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] 🚨 MULTI-OUTCOME ARBITRAGE FOUND!")
+    print(f"Market: {q}")
+    print(f"Details: {', '.join(details)}")
+    print(f"Total Cost: ${total:.3f} | Potential Profit: {profit:.2f}%")
     print(f"Link: https://polymarket.com/event/{slug}")
     print("-" * 60)
 
