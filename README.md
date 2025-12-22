@@ -37,13 +37,13 @@ Adjust constants in `scanner.py`:
 ### 1. Connect via SSH
 Ensure your private key is in the local `./ssh` directory.
 ```bash
-ssh -i ./ssh/[your_key] opc@92.5.20.42
+ssh -i ./ssh/ssh-key-2025-12-22.key opc@92.5.20.42
 ```
 
 ### 2. Copy Files to the VM
 Run from your **local machine**:
 ```bash
-scp -i ./ssh/[your_key] -r ./* opc@92.5.20.42:~/polymarket-bot/
+scp -i ./ssh/ssh-key-2025-12-22.key -r ./* opc@92.5.20.42:~/polymarket-bot/
 ```
 
 ### 3. Setup & Run on VM
