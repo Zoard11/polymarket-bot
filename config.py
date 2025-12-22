@@ -9,15 +9,16 @@ FEE_PCT = 0.5                 # Estimated fees/slippage buffer per platform (Tot
 # We calculate arbitrage based on this trade size to account for slippage
 TARGET_TRADE_SIZE_USD = 200   
 
-# Market Filtering
-MIN_VOLUME_24H = 10000        # Minimum market volume to consider
-MIN_LIQUIDITY_USD = 100       # Minimum liquidity at the best price
+# Risk Management
+MAX_EXPOSURE_PER_MARKET_USD = 1000  # Cap on total position size
+MAX_TOTAL_OPEN_TRADES = 5          # Number of concurrent arbs to track
+MIN_MARKET_AGE_HOURS = 1           # Avoid brand new, ultra-volatile markets
 
-# Hardware / Performance
-POLL_INTERVAL_POLY = 15       # Fast polling for internal arbs
-POLL_INTERVAL_CROSS = 30      # Slower for NLP model overhead
-MAX_P_MARKETS = 150           
-MAX_K_MARKETS = 1000          
+# Statistical Modeling / Volatility
+# Adjust profit threshold based on 24h volume/volatility proxies
+VOLATILITY_ADJUSTMENT_ENABLED = True
+HIGH_VOL_PROFIT_BUFFER = 0.5       # Add 0.5% buffer to threshold for high-vol markets
 
-# NLP Settings
-NLP_MATCH_THRESHOLD = 0.82    # Cosine similarity for high-confidence matches
+# Robustness
+API_MAX_RETRIES = 3
+API_RETRY_DELAY = 5                # Seconds between retries

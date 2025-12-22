@@ -2,8 +2,10 @@ import time
 import argparse
 from datetime import datetime
 from poly_client import PolyClient
-
 import config
+
+# Global Instance
+poly = PolyClient()
 
 def parse_p(p_str):
     """Convert Polymarket cents (ints/strings) to dollars."""
@@ -16,15 +18,11 @@ def get_vwap_price(order_list, target_usd):
     
     total_spent = 0
     total_qty = 0
-    
-    # Sort by price (low to high)
     sorted_orders = sorted(order_list, key=lambda x: float(x['price']))
     
     for order in sorted_orders:
         price = parse_p(order['price'])
         size = float(order.get('size', 0))
-        
-        # Max USD we can spend at this level
         max_usd_level = price * size
         remaining_to_fill = target_usd - total_spent
         
@@ -39,34 +37,45 @@ def get_vwap_price(order_list, target_usd):
             
     return None
 
+def get_dynamic_threshold(market_volume):
+    """Adjust minimum profit based on market volume (proxy for volatility)."""
+    threshold = config.MIN_PROFIT_PCT
+    if not config.VOLATILITY_ADJUSTMENT_ENABLED:
+        return threshold
+    
+    # If volume is low (e.g. < 50k), add a buffer for safety
+    if market_volume < 50000:
+        threshold += config.HIGH_VOL_PROFIT_BUFFER
+    return threshold
+
 def check_internal_arbitrage(market, ob):
-    """Check for arbitrage opportunities using VWAP depth and Fees."""
+    """Check for arbitrage opportunities using VWAP depth and dynamic thresholds."""
     if not ob: return
     question = market.get('question', 'Unknown')
     slug = market.get('slug', '')
+    volume = float(market.get('volume24hr', 0))
     
-    yes_list = ob.get('yes', [])
-    no_list = ob.get('no', [])
-    outcomes = ob.get('outcomes', [])
-
+    # Statistical Adjustment
+    min_profit = get_dynamic_threshold(volume)
     fee_multiplier = 1 + (config.FEE_PCT / 100)
 
     # Scenario 1: Binary
-    if (yes_list or no_list) and not outcomes:
+    if (ob.get('yes') or ob.get('no')) and not ob.get('outcomes'):
         try:
-            y_price = get_vwap_price(yes_list, config.TARGET_TRADE_SIZE_USD / 2)
-            n_price = get_vwap_price(no_list, config.TARGET_TRADE_SIZE_USD / 2)
+            y_price = get_vwap_price(ob.get('yes', []), config.TARGET_TRADE_SIZE_USD / 2)
+            n_price = get_vwap_price(ob.get('no', []), config.TARGET_TRADE_SIZE_USD / 2)
             
             if y_price and n_price:
                 total_cost = (y_price + n_price) * fee_multiplier
-                if total_cost < 1 - (config.MIN_PROFIT_PCT / 100):
+                if total_cost < 1 - (min_profit / 100):
                     profit = (1 - total_cost) * 100
-                    print_alert("BINARY (NET)", question, total_cost, profit, slug)
+                    print_alert("BINARY (NET)", question, total_cost, profit, slug, volume=volume)
         except: pass
             
     # Scenario 2: Multi-outcome
-    elif outcomes:
+    elif ob.get('outcomes'):
         try:
+            outcomes = ob['outcomes']
             target_per_outcome = config.TARGET_TRADE_SIZE_USD / len(outcomes)
             total_sum = 0
             details = []
@@ -79,15 +88,16 @@ def check_internal_arbitrage(market, ob):
                 else: return
             
             total_cost = total_sum * fee_multiplier
-            if total_cost < 1 - (config.MIN_PROFIT_PCT / 100):
+            if total_cost < 1 - (min_profit / 100):
                 profit = (1 - total_cost) * 100
-                print_alert("MULTI (NET)", question, total_cost, profit, slug, details)
+                print_alert("MULTI (NET)", question, total_cost, profit, slug, details, volume=volume)
         except: pass
 
-def print_alert(type_name, q, total, profit, slug, details=None):
+def print_alert(type_name, q, total, profit, slug, details=None, volume=0):
     icon = "🔥"
     alert_text = f"\n[{datetime.now().strftime('%H:%M:%S')}] {icon} {type_name} ARBITRAGE FOUND!\n"
     alert_text += f"Market: {q}\n"
+    alert_text += f"Market Volume: ${volume:,.0f}\n"
     if details: alert_text += f"Details: {', '.join(details)}\n"
     alert_text += f"Total Cost: ${total:.3f} | Net Profit: {profit:.2f}%\n"
     alert_text += f"Link: https://polymarket.com/event/{slug}\n"
@@ -100,16 +110,13 @@ def print_alert(type_name, q, total, profit, slug, details=None):
             f.write(alert_text)
     except: pass
 
-# Global Instance
-poly = PolyClient()
-
 def main():
-    parser = argparse.ArgumentParser(description="Pure Polymarket Arbitrage Scanner")
+    parser = argparse.ArgumentParser(description="Professional Polymarket Arbitrage Scanner")
     parser.add_argument("--once", action="store_true", help="Run once and exit")
     args = parser.parse_args()
 
-    print("Polymarket Internal Arbitrage Scanner (Professional Mode)")
-    print(f"Settings: Min Net Profit {config.MIN_PROFIT_PCT}%, Trade Size ${config.TARGET_TRADE_SIZE_USD}\n")
+    print("Polymarket Internal Arbitrage Scanner (Professional Suite)")
+    print(f"Base Profit: {config.MIN_PROFIT_PCT}% | Fee Adjustment: {config.FEE_PCT}%\n")
     
     while True:
         try:
