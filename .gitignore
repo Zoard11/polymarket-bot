@@ -45,3 +45,4 @@ logs/
 *.log
 *.jsonl
 market_archive.json
+*.remote
