@@ -1,10 +1,11 @@
-# Polymarket Arbitrage Scanner Bot
-
-A real-time scanner for identifying "Pure Arbitrage" opportunities on Polymarket using the Gamma API.
+A real-time scanner for identifying "Pure Arbitrage" (Polymarket) and "Cross-Platform Arbitrage" (Polymarket vs Kalshi) opportunities.
 
 ## 🚀 Overview
 
-This bot monitors high-volume binary markets on Polymarket to find "Dutch Book" opportunities where the combined price of **YES** and **NO** shares is less than $1.00. 
+This bot monitors high-volume markets on Polymarket and Kalshi to find risk-free profit opportunities:
+1. **Dutch Book Arbitrage**: Combined price of YES and NO shares on Polymarket is < $1.00.
+2. **Multi-Outcome Arbitrage**: Sum of all outcomes in a categorical market is < $1.00.
+3. **Cross-Platform Arbitrage**: Price discrepancy between Polymarket and Kalshi for the same event (e.g. Poly YES + Kalshi NO < $1.00).
 
 ### How it works
 1. **Fetch Markets**: Retrieves the top 1000 active markets sorted by 24h volume.
