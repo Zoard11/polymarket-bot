@@ -7,8 +7,9 @@ from kalshi_client import KalshiClient
 import config
 
 # Use the same logic as the scanners for parity
-from poly_scanner import get_vwap_price as get_poly_vwap
+from poly_scanner import get_vwap_price as get_poly_vwap, calculate_kelly_size, get_dynamic_threshold
 from cross_scanner import get_vwap_price as get_k_vwap, find_kalshi_match_semantic
+from risk_manager import RiskManager
 
 ARCHIVE_FILE = "market_archive.jsonl"
 
@@ -65,6 +66,9 @@ class BacktestEngine:
         total_potential_profit = 0
         snapshots_count = 0
         
+        # Local risk manager for the simulation
+        sim_risk = RiskManager()
+        
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
                 for line in f:
@@ -82,10 +86,12 @@ class BacktestEngine:
                         
                         # Use internal poly_scanner logic (we'd need to refactor scanners to export pure logic)
                         # For now, a simplified check:
-                        res = self._check_internal_sim(m, ob)
+                        res = self._check_internal_sim(m, ob, sim_risk)
                         if res:
                             total_opportunities += 1
-                            current_snap_profit += res['profit']
+                            current_snap_profit += res['profit_usd']
+                            # Count profit in % for the general return stat too
+                            total_potential_profit += res['profit_pct'] 
 
                     # 2. Cross-platform
                     k_embeddings = None
@@ -105,10 +111,11 @@ class BacktestEngine:
                         # Cross match
                         k_match = find_kalshi_match_semantic(m, k_active, k_embeddings)
                         if k_match:
-                            res = self._check_cross_sim(m, ob, k_match)
+                            res = self._check_cross_sim(m, ob, k_match, sim_risk)
                             if res:
                                 total_opportunities += 1
-                                current_snap_profit += res['profit']
+                                current_snap_profit += res['profit_usd']
+                                total_potential_profit += res['profit_pct']
 
                     total_potential_profit += current_snap_profit
                     equity_curve.append(equity_curve[-1] + current_snap_profit)
@@ -139,7 +146,7 @@ class BacktestEngine:
         print("="*40)
         print(f"Snapshots Processed: {snapshots_count}")
         print(f"Total Opps Found:    {total_opportunities}")
-        print(f"Total Return:        {total_potential_profit:.2f}%")
+        print(f"Total Theoretical Profit: ${total_potential_profit:,.2f} USD")
         print(f"Avg Profit/Trade:    {total_potential_profit/max(1, total_opportunities):.2f}%")
         print("-" * 40)
         print(f"Sharpe Ratio:        {sharp_ratio:.2f}")
@@ -147,28 +154,38 @@ class BacktestEngine:
         print(f"Expectancy:          {total_potential_profit/max(1, snapshots_count):.4f}% per interval")
         print("="*40)
 
-    def _check_internal_sim(self, market, ob):
-        # Simplified simulation logic for the replay
+    def _check_internal_sim(self, market, ob, risk_mgr):
+        volume = float(market.get('volume24hr', 0))
+        min_profit = get_dynamic_threshold(volume)
         fee_multiplier = 1 + (config.FEE_PCT / 100)
+        
         y_price = get_poly_vwap(ob.get('yes', []), config.TARGET_TRADE_SIZE_USD / 2)
         n_price = get_poly_vwap(ob.get('no', []), config.TARGET_TRADE_SIZE_USD / 2)
         
         if y_price and n_price:
             total_cost = (y_price + n_price) * fee_multiplier
-            if total_cost < 1 - (config.MIN_PROFIT_PCT / 100):
-                return {"profit": (1 - total_cost) * 100}
+            if total_cost < 1 - (min_profit / 100):
+                profit_pct = (1 - total_cost) * 100
+                rec_size = calculate_kelly_size(profit_pct)
+                
+                # Simulation risk check
+                can_add, _ = risk_mgr.can_add_position(market['slug'], market['slug'], rec_size)
+                if can_add:
+                    risk_mgr.record_trade(market['slug'], market['slug'], rec_size)
+                    return {"profit_usd": (profit_pct/100) * rec_size, "profit_pct": profit_pct}
         return None
 
-    def _check_cross_sim(self, poly_market, poly_ob, kalshi_market):
+    def _check_cross_sim(self, poly_market, poly_ob, kalshi_market, risk_mgr):
         fee_multiplier = 1 + (config.FEE_PCT / 100)
-        target_leg = config.TARGET_TRADE_SIZE_USD / 2
+        volume = float(poly_market.get('volume24hr', 0))
+        min_profit = get_dynamic_threshold(volume)
+        target_leg = config.TARGET_TRADE_SIZE_USD / 2 # Fallback for VWAP
         
         p_yes_vwap = get_poly_vwap(poly_ob.get('yes', []), target_leg)
         p_no_vwap = get_poly_vwap(poly_ob.get('no', []), target_leg)
         
-        # Note: In backtest, we might not have archived full Kalshi orderbooks 
-        # unless the collector was updated. For now, assume best quotes or skip.
-        # This is where we'd need Kalshi depth data in the snapshot.
+        # Simplified assumption for backtest: Kalshi depth matches Poly approx or uses best quotes
+        # In a real replay we'd need Kalshi depth too.
         return None 
 
 if __name__ == "__main__":
