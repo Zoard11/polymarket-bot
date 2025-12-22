@@ -7,8 +7,8 @@ echo "--------------------------------------------------"
 echo "🚀 Starting Polymarket Arbitrage Bot Suite 🚀"
 echo "--------------------------------------------------"
 
-# Kill existing python processes to avoid duplicates
-pkill -f python3
+# Kill existing bot processes to avoid duplicates (avoiding system python processes)
+pkill -f "scanner.py|backtest.py"
 
 # Standard Arbitrage Scanners
 echo "[1/5] Launching Poly Internal Scanner..."
