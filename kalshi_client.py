@@ -1,6 +1,7 @@
 import requests
 
-KALSHI_API_URL = "https://trading-api.kalshi.com/trade-api/v2"
+# Kalshi Public API (Elections domain allows unauthenticated market data)
+KALSHI_API_URL = "https://api.elections.kalshi.com/trade-api/v2"
 
 class KalshiClient:
     def __init__(self):
