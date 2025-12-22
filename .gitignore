@@ -43,3 +43,5 @@ ENV/
 # Project specific
 logs/
 *.log
+*.jsonl
+market_archive.json

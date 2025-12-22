@@ -1,7 +1,5 @@
 import time
 import json
-import numpy as np
-import threading
 from datetime import datetime
 from poly_client import PolyClient
 from kalshi_client import KalshiClient
@@ -65,12 +63,18 @@ class CorrelatedScanner:
         pass
 
 if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--once", action="store_true")
+    args = parser.parse_args()
+
     scanner = CorrelatedScanner()
     print("Correlated Pairs & Spread Scanner (Ultra-Pro)")
     while True:
         try:
             scanner.check_correlations()
-            time.sleep(config.POLL_INTERVAL_WS if config.WS_ENABLED else config.POLL_INTERVAL_CROSS)
+            if args.once: break
+            time.sleep(config.POLL_INTERVAL_CORR)
         except KeyboardInterrupt:
             break
         except Exception as e:

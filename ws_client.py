@@ -5,11 +5,11 @@ import time
 
 class PolyWebSocket:
     """
-    Manages a persistent WebSocket connection to Polymarket CLOB.
+    Manages a persistent WebSocket connection to Polymarket.
     Updates an in-memory orderbook cache in real-time.
     """
     def __init__(self):
-        self.ws_url = "wss://clob.polymarket.com/ws"
+        self.ws_url = "wss://ws-live-data.polymarket.com"
         self.orderbooks = {} # {asset_id: orderbook}
         self.ws = None
         self.thread = None
@@ -39,12 +39,15 @@ class PolyWebSocket:
 
     def subscribe(self, asset_ids):
         """Subscribe to orderbook updates for specific assets."""
+        # ws-live-data uses a different format than internal CLOB
+        # It uses 'market_ids' and 'type': 'subscribe'
         payload = {
             "type": "subscribe",
-            "assets_ids": asset_ids,
-            "channels": ["book"]
+            "market_ids": asset_ids,
+            "channels": ["orderbook"]
         }
-        self.ws.send(json.dumps(payload))
+        if self.ws and self.ws.sock and self.ws.sock.connected:
+            self.ws.send(json.dumps(payload))
 
     def start(self):
         self.ws = websocket.WebSocketApp(

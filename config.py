@@ -34,4 +34,10 @@ POLL_INTERVAL_POLY = 15            # Seconds between Polymarket scans
 
 # HFT / WebSocket Settings
 WS_ENABLED = True
-POLL_INTERVAL_WS = 0.1             # Sub-second check for cache-based logic
+POLL_INTERVAL_WS = 0.5             # Loop frequency when WS is enabled (check cache)
+POLL_INTERVAL_CORR = 10            # Frequency for correlation/logical scanning
+
+# Cross-Platform Settings
+MAX_K_MARKETS = 300                # Max active Kalshi markets to fetch
+POLL_INTERVAL_CROSS = 60           # Seconds between cross-platform scans
+NLP_MATCH_THRESHOLD = 0.82         # Minimum cosine similarity for semantic matching
