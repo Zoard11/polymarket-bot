@@ -34,6 +34,11 @@ POLL_INTERVAL_POLY = 15            # Seconds between Polymarket scans
 HF_KEYWORDS = ["Up or Down", "15m", "15-minute"] # Keywords to force-include regardless of volume
 HF_LIMIT = 50                      # Max high-frequency markets to track
 
+# Maker Strategy Settings
+MAKER_MIN_PROFIT_PCT = 1.0         # Minimum spread profit to trigger alert (e.g. 1.0%)
+MAKER_ALLOW_DEAD_MARKETS = False   # If True, allows markets with 0 bids (Cost=0) -> 100% spread
+MAKER_MIN_SIDE_PRICE = 0.01        # Minimum bid on EACH side to consider market "Alive"
+
 # HFT / WebSocket Settings
 WS_ENABLED = True
 POLL_INTERVAL_WS = 0.5             # Loop frequency when WS is enabled (check cache)

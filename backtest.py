@@ -126,47 +126,76 @@ class BacktestEngine:
         print(f"Deep Backtest Analysis: {file_path}")
         stats = {
             "POLY_INTERNAL": 0,
-            "MAKER_SPREAD": 0,
             "HF_SCALPING": 0,
+            "MAKER_HF": 0,
+            "MAKER_GEN": 0,
             "CROSS_PLATFORM": 0,
             "CORRELATED": 0
         }
         
-        maker_hits = [] # Store names to see WHAT we are hitting
+        maker_hits = [] 
 
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
                 for line in f:
                     snap = json.loads(line)
                     p_markets = snap.get('poly_markets', [])
+                    k_markets = snap.get('kalshi_markets', [])
                     
                     for row in p_markets:
                         m = row['market']
                         ob = row['orderbook']
                         
-                        # --- MAKER (COFFEE) ---
-                        # STRICT CHECK: Must be 2% profit (same as live)
-                        if self._sim_maker(m, ob, threshold=0.98): 
-                            stats["MAKER_SPREAD"] += 1
-                            maker_hits.append(m.get('question'))
+                        # 1. POLY INTERNAL
+                        if self._sim_poly_internal(m, ob): stats["POLY_INTERNAL"] += 1
                         
-                        # --- HF SCALPING ---
+                        # 2. HF SCALPING
                         if self._sim_hf(m, ob): stats["HF_SCALPING"] += 1
+
+                        # 3. MAKER (SPLIT)
+                        # Uses config.MAKER_MIN_PROFIT_PCT and config.MAKER_ALLOW_DEAD_MARKETS dynamically
+                        is_maker = self._sim_maker(m, ob)
+                        if is_maker:
+                            # Classify as HF or Gen
+                            if "Up or Down" in m.get('question', ''):
+                                stats["MAKER_HF"] += 1
+                            else:
+                                stats["MAKER_GEN"] += 1
+                                maker_hits.append(m.get('question'))
+
+                        # 4. CROSS PLATFORM
+                        if k_markets:
+                            p_slug = m.get('slug', '').lower()
+                            # Simple substring match
+                            for km in k_markets:
+                                if km.get('ticker', '').lower() in p_slug:
+                                    if self._sim_cross(m, ob, km): 
+                                        stats["CROSS_PLATFORM"] += 1
+                                    break
                         
         except Exception as e:
             print(f"Analysis failed: {e}")
             return
 
         print("\n" + "="*50)
-        print("   🚀 COMPREHENSIVE BACKTEST RESULTS   ")
+        print("   🚀 COMPREHENSIVE BACKTEST RESULTS (7 SCRIPTS)   ")
         print("="*50)
-        for strategy, count in stats.items():
-            print(f"{strategy.ljust(20)}: {count} opportunities detected")
+        print(f"1. POLY_INTERNAL    : {stats['POLY_INTERNAL']} opps")
+        print(f"2. CROSS_PLATFORM   : {stats['CROSS_PLATFORM']} opps")
+        print(f"3. CORRELATED       : {stats['CORRELATED']} opps (Skeleton)")
+        print(f"4. HF_SCALPING      : {stats['HF_SCALPING']} opps")
+        print(f"5. MAKER_HF         : {stats['MAKER_HF']} opps")
+        print(f"6. MAKER_GEN        : {stats['MAKER_GEN']} opps")
         print("-" * 50)
-        print("TOP 5 MAKER MARKET MATCHES:")
+        print("TOP 5 GENERAL MAKER MATCHES:")
         for name in list(set(maker_hits))[:5]:
             print(f" - {name}")
         print("="*50)
+    
+    def _sim_cross(self, pm, pob, km):
+        # Placeholder for cross-platform check using just prices
+        # Real logic is in cross_scanner.py
+        return False
 
     # Simulation Wrappers (Adapters)
     def _sim_poly_internal(self, m, ob):
@@ -179,14 +208,22 @@ class BacktestEngine:
         except: pass
         return False
 
-    def _sim_maker(self, m, ob, threshold=0.98):
+    def _sim_maker(self, m, ob):
         try:
             y_bid = float(ob.get('yes', {}).get('bids', [])[0]['price'])
             n_bid = float(ob.get('no', {}).get('bids', [])[0]['price'])
             
-            # COST to Join Bids = Bid_Yes + Bid_No
+            # 1. Check Dead Markets (Low Liquidity)
+            if not config.MAKER_ALLOW_DEAD_MARKETS:
+                # Must have at least X cents of bids on both sides to be "Alive"
+                if y_bid < config.MAKER_MIN_SIDE_PRICE or n_bid < config.MAKER_MIN_SIDE_PRICE: 
+                    return False
+
+            # 2. Check Profit Threshold from Config
             cost = y_bid + n_bid
-            if cost < threshold and cost > 0.01: # Filter out dead markets with 0 bids
+            threshold = 1.0 - (config.MAKER_MIN_PROFIT_PCT / 100.0)
+            
+            if cost < threshold:
                 return True
         except: pass
         return False

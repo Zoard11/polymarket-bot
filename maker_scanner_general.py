@@ -8,9 +8,8 @@ import config
 # Global Instance
 poly = PolyClient()
 
-# General Maker Settings (Looser/Slower)
-MAKER_MIN_SPREAD_PROFIT = 2.0  # 2% spread
-MAKER_POLL_INTERVAL = 15.0     # Slower poll for 200 markets to avoid rate limits
+# General Maker Settings (from config)
+MAKER_POLL_INTERVAL = 15.0     # Slower poll for 200 markets
 
 def parse_p(p_str):
     try:
@@ -35,14 +34,17 @@ def check_maker_opportunity(market, obs):
     y_bid = get_best_bid(obs.get('yes', {}).get('bids', []))
     n_bid = get_best_bid(obs.get('no', {}).get('bids', []))
     
-    if y_bid > 0 and n_bid > 0:
-        current_implied_cost = y_bid + n_bid
-        
-        # Profit = 1.00 - Cost
-        potential_profit_pct = (1.0 - current_implied_cost) * 100
-        
-        if potential_profit_pct >= MAKER_MIN_SPREAD_PROFIT:
-            print_maker_alert(question, current_implied_cost, potential_profit_pct, y_bid, n_bid, slug)
+    # Dead Market Check
+    if not config.MAKER_ALLOW_DEAD_MARKETS:
+        if y_bid == 0 or n_bid == 0: return
+
+    current_implied_cost = y_bid + n_bid
+    
+    # Profit = 1.00 - Cost
+    potential_profit_pct = (1.0 - current_implied_cost) * 100
+    
+    if potential_profit_pct >= config.MAKER_MIN_PROFIT_PCT:
+        print_maker_alert(question, current_implied_cost, potential_profit_pct, y_bid, n_bid, slug)
 
 def print_maker_alert(q, cost, profit, y_bid, n_bid, slug):
     alert_text = f"\n[{datetime.now().strftime('%H:%M:%S')}] [MAKER-GEN] 🐢 SLOW SPREAD FOUND!\n"
