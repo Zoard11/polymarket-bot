@@ -49,7 +49,6 @@ def check_maker_opportunity(market, obs):
         print_maker_alert(question, current_implied_cost, potential_profit_pct, y_bid, n_bid, slug)
         
         # TRIGGER EXECUTION (MOCK)
-        print(f"[DEBUG] Triggering TradeExecutor for {slug}...")
         executor.place_maker_orders(market, y_bid, n_bid)
 
 def print_maker_alert(q, cost, profit, y_bid, n_bid, slug):
