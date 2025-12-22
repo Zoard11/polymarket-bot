@@ -2,6 +2,15 @@ import requests
 import json
 import time
 from datetime import datetime
+# Polymarket Gamma API
+GAMMA_API_URL = "https://gamma-api.polymarket.com"
+
+# Configuration
+MIN_PROFIT_PCT = 1.0          # Only show opportunities > 1% profit
+MIN_VOLUME_24H = 50000        # Only scan markets with > $50k volume (in USD)
+POLL_INTERVAL = 10            # Seconds between full scans
+MAX_MARKETS = 50              # Max markets to scan per cycle
+
 # Global state
 markets_cache = {}
 
