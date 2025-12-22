@@ -49,6 +49,7 @@ def check_maker_opportunity(market, obs):
         print_maker_alert(question, current_implied_cost, potential_profit_pct, y_bid, n_bid, slug)
         
         # TRIGGER EXECUTION (MOCK)
+        print(f"[DEBUG] Triggering TradeExecutor for {slug}...")
         executor.place_maker_orders(market, y_bid, n_bid)
 
 def print_maker_alert(q, cost, profit, y_bid, n_bid, slug):
@@ -80,8 +81,8 @@ def main():
             targets = markets
 
             # Parallel Fetch
-            with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
-                future_to_market = {executor.submit(poly.get_market_orderbooks, m): m for m in targets}
+            with concurrent.futures.ThreadPoolExecutor(max_workers=10) as thread_pool:
+                future_to_market = {thread_pool.submit(poly.get_market_orderbooks, m): m for m in targets}
                 for future in concurrent.futures.as_completed(future_to_market):
                     market = future_to_market[future]
                     obs = future.result()
