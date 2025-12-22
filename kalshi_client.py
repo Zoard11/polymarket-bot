@@ -24,24 +24,25 @@ class KalshiClient:
             return []
 
     def get_market_orderbook(self, ticker):
-        """Fetch best bid/ask for a specific ticker."""
+        """Fetch best YES and NO asks for a specific ticker."""
         url = f"{KALSHI_API_URL}/markets/{ticker}/orderbook"
         try:
             resp = self.session.get(url, timeout=5)
             resp.raise_for_status()
-            data = resp.json().get('orderbook', {})
+            ob = resp.json().get('orderbook', {})
             
-            # Kalshi returns list of [price, size]
+            # Kalshi V2 returns 'yes' and 'no' lists of [price, size]
+            # These are the ASK prices for the respective sides.
+            yes_asks = ob.get('yes', [])
+            no_asks = ob.get('no', [])
+            
             # Best ask is the one with the lowest price
-            asks = data.get('asks', [])
-            bids = data.get('bids', [])
-            
-            best_ask = min(asks, key=lambda x: x[0]) if asks else None
-            best_bid = max(bids, key=lambda x: x[0]) if bids else None
+            best_yes_ask = min(yes_asks, key=lambda x: x[0]) if yes_asks else None
+            best_no_ask = min(no_asks, key=lambda x: x[0]) if no_asks else None
             
             return {
-                'best_ask': best_ask, # [price, size]
-                'best_bid': best_bid  # [price, size]
+                'yes_ask': best_yes_ask, # [price, size]
+                'no_ask': best_no_ask    # [price, size]
             }
         except Exception:
             return None

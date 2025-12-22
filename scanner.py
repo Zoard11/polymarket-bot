@@ -98,8 +98,48 @@ def check_arbitrage(market, ob):
 
 def check_cross_platform_arb(poly_market, poly_ob, kalshi_market):
     """Check for arbitrage between Polymarket and Kalshi."""
-    # Note: Cross-matching is experimental and requires precise outcome mapping.
-    pass
+    # 1. Poly Asks
+    yes_list = poly_ob.get('yes', [])
+    no_list = poly_ob.get('no', [])
+    
+    p_yes_best = min(yes_list, key=lambda x: float(x['price'])) if yes_list else None
+    p_no_best = min(no_list, key=lambda x: float(x['price'])) if no_list else None
+    
+    if not p_yes_best or not p_no_best: return
+    
+    p_yes_ask = parse_p(p_yes_best['price'])
+    p_no_ask = parse_p(p_no_best['price'])
+    
+    # 2. Kalshi Asks
+    k_data = kalshi.get_market_orderbook(kalshi_market.get('ticker'))
+    if not k_data: return
+    
+    k_yes_ask_data = k_data.get('yes_ask')
+    k_no_ask_data = k_data.get('no_ask')
+    
+    if not k_yes_ask_data or not k_no_ask_data: return
+    
+    k_yes_ask = float(k_yes_ask_data[0]) / 100.0
+    k_no_ask = float(k_no_ask_data[0]) / 100.0
+    
+    # 3. Arbitrage Checks
+    # Case A: Buy Poly YES + Kalshi NO
+    total_a = p_yes_ask + k_no_ask
+    if total_a < 1 - (MIN_PROFIT_PCT / 100):
+        # Liquidity check
+        p_liq = p_yes_ask * float(p_yes_best.get('size', 0))
+        k_liq = k_no_ask * float(k_no_ask_data[1])
+        if p_liq >= MIN_LIQUIDITY_USD and k_liq >= MIN_LIQUIDITY_USD:
+            print_alert("CROSS (Poly YES + Kalshi NO)", poly_market['question'], total_a, (1-total_a)*100, poly_market['slug'])
+
+    # Case B: Buy Kalshi YES + Poly NO
+    total_b = k_yes_ask + p_no_ask
+    if total_b < 1 - (MIN_PROFIT_PCT / 100):
+        # Liquidity check
+        k_liq = k_yes_ask * float(k_yes_ask_data[1])
+        p_liq = p_no_ask * float(p_no_best.get('size', 0))
+        if k_liq >= MIN_LIQUIDITY_USD and p_liq >= MIN_LIQUIDITY_USD:
+            print_alert("CROSS (Kalshi YES + Poly NO)", poly_market['question'], total_b, (1-total_b)*100, poly_market['slug'])
 
 def print_alert(type_name, q, total, profit, slug, details=None):
     icon = "🔥" if type_name == "BINARY" else "🚨"
@@ -131,6 +171,11 @@ def main():
                 if not ob: continue
                 
                 check_arbitrage(market, ob)
+                
+                # Cross-Platform Check
+                k_match = find_kalshi_match(market.get('question'), k_active)
+                if k_match:
+                    check_cross_platform_arb(market, ob, k_match)
             
             if args.once:
                 print("\nSingle scan completed (--once). Exiting.")
