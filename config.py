@@ -28,9 +28,11 @@ API_MAX_RETRIES = 3
 API_RETRY_DELAY = 5                # Seconds between retries
 
 # Scanner Settings
-MIN_VOLUME_24H = 10000             # Minimum 24h volume for a market to be considered
+MIN_VOLUME_24H = 10000             # Minimum 24h volume for standard markets
 MAX_P_MARKETS = 200                # Max Polymarket events to fetch per cycle
 POLL_INTERVAL_POLY = 15            # Seconds between Polymarket scans
+HF_KEYWORDS = ["Up or Down", "15m", "15-minute"] # Keywords to force-include regardless of volume
+HF_LIMIT = 50                      # Max high-frequency markets to track
 
 # HFT / WebSocket Settings
 WS_ENABLED = True

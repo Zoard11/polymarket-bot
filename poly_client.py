@@ -31,7 +31,6 @@ class PolyClient:
     def fetch_active_markets(self, min_volume=10000, limit=100):
         url = f"{GAMMA_API_URL}/markets"
         params = {
-            "active": "true",
             "closed": "false",
             "limit": 1000,
             "order_by": "volume24hr",
@@ -41,8 +40,22 @@ class PolyClient:
         if resp:
             try:
                 markets = resp.json()
-                active = [m for m in markets if float(m.get('volume24hr', 0)) >= min_volume][:limit]
-                return active
+                # 1. Standard High-Volume Markets
+                active = [m for m in markets if m.get('active') is True and float(m.get('volume24hr', 0)) >= min_volume]
+                
+                # 2. High-Frequency 'Up or Down' Markets (force-include)
+                hf_keywords = getattr(config, 'HF_KEYWORDS', [])
+                hf = [m for m in markets if any(k in m.get('question','') for k in hf_keywords)]
+                
+                # Merge and unique (using market ID)
+                seen_ids = set()
+                combined = []
+                for m in (hf[:config.HF_LIMIT] + active):
+                    if m['id'] not in seen_ids:
+                        combined.append(m)
+                        seen_ids.add(m['id'])
+                
+                return combined[:limit]
             except: pass
         return []
 
