@@ -12,17 +12,28 @@ This bot monitors high-volume binary markets on Polymarket to find "Dutch Book" 
 3. **Order Book Scan**: For each market, it fetches the actual Order Book **Ask prices**.
 4. **Arbitrage Calculation**: If `Price(YES Ask) + Price(NO Ask) < $0.99` (adjustable), it signals an opportunity.
 
-## 🛠 Installation
+## 🐧 WSL (Linux) Setup
 
-1. **Clone the repository**:
+If you are running in WSL and encounter `pip: command not found`, follow these steps:
+
+1. **Update package list**:
    ```bash
-   git clone https://github.com/Zoard11/polymarket-bot.git
-   cd polymarket-bot
+   sudo apt update
    ```
 
-2. **Install dependencies**:
+2. **Install pip**:
    ```bash
-   pip install -r requirements.txt
+   sudo apt install python3-pip
+   ```
+
+3. **Install dependencies**:
+   ```bash
+   python3 -m pip install -r requirements.txt
+   ```
+
+4. **Run the scanner**:
+   ```bash
+   python3 scanner.py
    ```
 
 ## 💻 Usage
