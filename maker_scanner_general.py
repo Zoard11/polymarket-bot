@@ -13,6 +13,12 @@ executor = TradeExecutor(poly)
 # General Maker Settings (from config)
 MAKER_POLL_INTERVAL = 15.0     # Slower poll for 200 markets
 
+# Initialize WebSocket for real-time orderbook updates
+from ws_client import poly_ws
+if config.WS_ENABLED:
+    poly_ws.start()
+    print("🌐 WebSocket client started for real-time orderbook updates...")
+
 def parse_p(p_str):
     try:
         val = float(p_str)
@@ -82,6 +88,19 @@ def main():
             
             # No KW filter -> Scan everything
             targets = markets
+
+            # Subscribe to WebSocket for real-time updates (reduces REST API calls)
+            if config.WS_ENABLED:
+                token_ids = []
+                for m in targets:
+                    tids = m.get('clobTokenIds')
+                    if isinstance(tids, str):
+                        import json
+                        tids = json.loads(tids)
+                    if tids:
+                        token_ids.extend(tids)
+                if token_ids:
+                    poly_ws.subscribe(token_ids)
 
             # Parallel Fetch
             with concurrent.futures.ThreadPoolExecutor(max_workers=10) as thread_pool:
