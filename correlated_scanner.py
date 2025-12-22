@@ -65,6 +65,7 @@ class CorrelatedScanner:
                     pass
 
     def scan_triangular_arb(self):
+        pass
 
 if __name__ == "__main__":
     scanner = CorrelatedScanner()
