@@ -25,6 +25,7 @@ include/
 share/
 lib/
 local/
+.ssh/
 
 # Environments
 .env

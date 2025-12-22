@@ -35,15 +35,15 @@ Adjust constants in `scanner.py`:
 ## ☁️ Oracle Cloud VM Deployment (92.5.20.42)
 
 ### 1. Connect via SSH
-Ensure your private key is in the local `./ssh` directory.
+Ensure your private key is in the local `~/.ssh` directory.
 ```bash
-ssh -i ./ssh/ssh-key-2025-12-22.key opc@92.5.20.42
+ssh -i ~/.ssh/ssh-key-2025-12-22.key ubuntu@92.5.20.42
 ```
 
 ### 2. Copy Files to the VM
 Run from your **local machine**:
 ```bash
-scp -i ./ssh/ssh-key-2025-12-22.key -r ./* opc@92.5.20.42:~/polymarket-bot/
+scp -i ~/.ssh/ssh-key-2025-12-22.key -r ./* ubuntu@92.5.20.42:~/polymarket-bot/
 ```
 
 ### 3. Setup & Run on VM

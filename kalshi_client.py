@@ -7,7 +7,7 @@ class KalshiClient:
     def __init__(self):
         self.session = requests.Session()
 
-    def fetch_active_markets(self, limit=100):
+    def fetch_active_markets(self, limit=1000):
         """Fetch active markets from Kalshi."""
         url = f"{KALSHI_API_URL}/markets"
         params = {
@@ -24,12 +24,24 @@ class KalshiClient:
             return []
 
     def get_market_orderbook(self, ticker):
-        """Fetch orderbook for a specific ticker."""
+        """Fetch best bid/ask for a specific ticker."""
         url = f"{KALSHI_API_URL}/markets/{ticker}/orderbook"
         try:
             resp = self.session.get(url, timeout=5)
             resp.raise_for_status()
-            return resp.json().get('orderbook', {})
-        except Exception as e:
-            # print(f"Error fetching Kalshi orderbook for {ticker}: {e}")
+            data = resp.json().get('orderbook', {})
+            
+            # Kalshi returns list of [price, size]
+            # Best ask is the one with the lowest price
+            asks = data.get('asks', [])
+            bids = data.get('bids', [])
+            
+            best_ask = min(asks, key=lambda x: x[0]) if asks else None
+            best_bid = max(bids, key=lambda x: x[0]) if bids else None
+            
+            return {
+                'best_ask': best_ask, # [price, size]
+                'best_bid': best_bid  # [price, size]
+            }
+        except Exception:
             return None
