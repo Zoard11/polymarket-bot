@@ -3,12 +3,13 @@
 Advanced bots for finding and verifying risk-free profit opportunities on Polymarket and Kalshi.
 
 ## 🚀 Key Features
-- **Professional-Grade Pricing**: Uses **VWAP (Volume Weighted Average Price)** from order book depth rather than just best asks.
+- **Kelly Criterion Sizing**: Dynamic position sizing based on identified edge and bankroll.
+- **Risk Correlation Limits**: Global event-level exposure caps via `risk_manager.py`.
+- **Professional-Grade Pricing**: Uses **VWAP (Volume Weighted Average Price)** from order book depth.
 - **Realistic Profitability**: Accounts for variable platform fees and estimated slippage.
 - **Dynamic Risk Management**: Adjusts profit thresholds based on market volatility (volume).
-- **Advanced NLP Matching**: Automatically pairs Polymarket and Kalshi events using `SentenceTransformers` (all-MiniLM-L6-v2).
-- **Resilient Execution**: Full API retry logic with exponential backoff and rate-limit handling.
-- **Backtesting & Data Archive**: Built-in engine to collect live market snapshots and replay strategies.
+- **Advanced NLP Matching**: Automatically pairs Polymarket and Kalshi events using `SentenceTransformers`.
+- **Advanced Backtesting Metrics**: Annualized Sharpe Ratio, Max Drawdown, and Expectancy reporting.
 
 ---
 
@@ -30,8 +31,9 @@ Advanced bots for finding and verifying risk-free profit opportunities on Polyma
 
 ## 🛠️ Configuration (`config.py`)
 Modify this file to adjust your risk profile:
-- `TARGET_TRADE_SIZE_USD`: The amount you intend to bet (crucial for slippage calculation).
-- `FEE_PCT`: Your total combined fee buffer (e.g., 0.5% - 1.0%).
+- `BANKROLL_USD`: The amount of capital used for sizing calculations.
+- `KELLY_FRACTION`: Conservatism multiplier (e.g., 0.2 for 20% Kelly).
+- `MAX_EVENT_EXPOSURE_USD`: Global limit for a single event across all platforms.
 - `MIN_PROFIT_PCT`: Minimum net profit required after all adjustments.
 
 ---

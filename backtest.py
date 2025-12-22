@@ -55,8 +55,12 @@ class BacktestEngine:
                 time.sleep(60)
 
     def analyze_archive(self, file_path):
-        """Replay strategy against archived data."""
+        """Replay strategy against archived data with advanced metrics."""
         print(f"Analyzing {file_path}...")
+        results = []
+        equity_curve = [0]
+        timestamps = []
+        
         total_opportunities = 0
         total_potential_profit = 0
         snapshots_count = 0
@@ -69,6 +73,7 @@ class BacktestEngine:
                     
                     p_markets_data = snap.get('poly_markets', [])
                     k_active = snap.get('kalshi_markets', [])
+                    current_snap_profit = 0
                     
                     # 1. Internal Poly Arbs
                     for data in p_markets_data:
@@ -80,20 +85,67 @@ class BacktestEngine:
                         res = self._check_internal_sim(m, ob)
                         if res:
                             total_opportunities += 1
-                            total_potential_profit += res['profit']
+                            current_snap_profit += res['profit']
 
                     # 2. Cross-platform
-                    # In a real replay, we'd need to cache embeddings for each snapshot
-                    # This is just a structural example of the replay flow
+                    k_embeddings = None
+                    if k_active:
+                        # Re-calculate embeddings for this snapshot
+                        try:
+                            from sentence_transformers import SentenceTransformer, util
+                            model = SentenceTransformer('all-MiniLM-L6-v2')
+                            k_texts = [(km.get('title', '') + " " + km.get('subtitle', '')).lower() for km in k_active]
+                            k_embeddings = model.encode(k_texts, convert_to_tensor=True)
+                        except: pass
+
+                    for data in p_markets_data:
+                        m = data['market']
+                        ob = data['orderbook']
+                        
+                        # Cross match
+                        k_match = find_kalshi_match_semantic(m, k_active, k_embeddings)
+                        if k_match:
+                            res = self._check_cross_sim(m, ob, k_match)
+                            if res:
+                                total_opportunities += 1
+                                current_snap_profit += res['profit']
+
+                    total_potential_profit += current_snap_profit
+                    equity_curve.append(equity_curve[-1] + current_snap_profit)
+                    timestamps.append(snap.get('timestamp'))
+
         except FileNotFoundError:
             print("Archive file not found.")
             return
 
-        print("\n--- Backtest Results ---")
+        # --- Statistics Calculation ---
+        import numpy as np
+        returns = np.diff(equity_curve)
+        
+        sharp_ratio = 0
+        if len(returns) > 1 and np.std(returns) > 0:
+            sharp_ratio = np.mean(returns) / np.std(returns) * np.sqrt(365 * 24 * (3600 / 300)) # Annualized from 5m bins
+            
+        # Max Drawdown
+        max_drawdown = 0
+        peak = equity_curve[0]
+        for val in equity_curve:
+            if val > peak: peak = val
+            drawdown = peak - val
+            if drawdown > max_drawdown: max_drawdown = drawdown
+
+        print("\n" + "="*40)
+        print("   PROFESSIONAL BACKTEST REPORT   ")
+        print("="*40)
         print(f"Snapshots Processed: {snapshots_count}")
-        print(f"Total Opps Found: {total_opportunities}")
-        if total_opportunities > 0:
-            print(f"Avg Profit per Opp: {total_potential_profit/total_opportunities:.2f}%")
+        print(f"Total Opps Found:    {total_opportunities}")
+        print(f"Total Return:        {total_potential_profit:.2f}%")
+        print(f"Avg Profit/Trade:    {total_potential_profit/max(1, total_opportunities):.2f}%")
+        print("-" * 40)
+        print(f"Sharpe Ratio:        {sharp_ratio:.2f}")
+        print(f"Max Drawdown:        {max_drawdown:.2f}%")
+        print(f"Expectancy:          {total_potential_profit/max(1, snapshots_count):.4f}% per interval")
+        print("="*40)
 
     def _check_internal_sim(self, market, ob):
         # Simplified simulation logic for the replay
@@ -106,6 +158,18 @@ class BacktestEngine:
             if total_cost < 1 - (config.MIN_PROFIT_PCT / 100):
                 return {"profit": (1 - total_cost) * 100}
         return None
+
+    def _check_cross_sim(self, poly_market, poly_ob, kalshi_market):
+        fee_multiplier = 1 + (config.FEE_PCT / 100)
+        target_leg = config.TARGET_TRADE_SIZE_USD / 2
+        
+        p_yes_vwap = get_poly_vwap(poly_ob.get('yes', []), target_leg)
+        p_no_vwap = get_poly_vwap(poly_ob.get('no', []), target_leg)
+        
+        # Note: In backtest, we might not have archived full Kalshi orderbooks 
+        # unless the collector was updated. For now, assume best quotes or skip.
+        # This is where we'd need Kalshi depth data in the snapshot.
+        return None 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Backtesting & Data Collection Suite")

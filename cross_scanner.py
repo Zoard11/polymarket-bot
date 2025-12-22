@@ -6,6 +6,7 @@ from datetime import datetime
 from poly_client import PolyClient
 from kalshi_client import KalshiClient
 import config
+from risk_manager import risk_manager
 
 # Global Instances
 poly = PolyClient()
@@ -32,6 +33,11 @@ def load_manual_mapping():
 def parse_p(p_str):
     try: return float(p_str) / 100.0
     except: return None
+
+def calculate_kelly_size(profit_pct):
+    if profit_pct <= 0: return config.TARGET_TRADE_SIZE_USD
+    size = config.BANKROLL_USD * (profit_pct / 100) * config.KELLY_FRACTION * 10
+    return max(config.TARGET_TRADE_SIZE_USD, min(size, config.MAX_EXPOSURE_PER_MARKET_USD))
 
 def get_vwap_price(order_list, target_usd, is_kalshi=False):
     if not order_list: return None
@@ -109,17 +115,26 @@ def check_cross_platform_arb(poly_market, poly_ob, kalshi_market):
     if p_yes_vwap and k_no_vwap:
         total = (p_yes_vwap + k_no_vwap) * fee_multiplier
         if total < 1 - (min_profit / 100):
-            print_alert("CROSS (Poly YES + Kalshi NO)", poly_market['question'], total, (1-total)*100, poly_market['slug'])
+            profit = (1 - total) * 100
+            rec_size = calculate_kelly_size(profit)
+            can_add, reason = risk_manager.can_add_position(poly_market['slug'], poly_market['slug'], rec_size)
+            risk_msg = "" if can_add else f" [RISK WARNING: {reason}]"
+            print_alert("CROSS (Poly YES + Kalshi NO)", poly_market['question'], total, profit, poly_market['slug'], size=rec_size, risk_msg=risk_msg)
 
     if k_yes_vwap and p_no_vwap:
         total = (k_yes_vwap + p_no_vwap) * fee_multiplier
         if total < 1 - (min_profit / 100):
-            print_alert("CROSS (Kalshi YES + Poly NO)", poly_market['question'], total, (1-total)*100, poly_market['slug'])
+            profit = (1 - total) * 100
+            rec_size = calculate_kelly_size(profit)
+            can_add, reason = risk_manager.can_add_position(poly_market['slug'], poly_market['slug'], rec_size)
+            risk_msg = "" if can_add else f" [RISK WARNING: {reason}]"
+            print_alert("CROSS (Kalshi YES + Poly NO)", poly_market['question'], total, profit, poly_market['slug'], size=rec_size, risk_msg=risk_msg)
 
-def print_alert(type_name, q, total, profit, slug):
-    alert_text = f"\n[{datetime.now().strftime('%H:%M:%S')}] 🌐 {type_name} ARBITRAGE FOUND!\n"
+def print_alert(type_name, q, total, profit, slug, size=0, risk_msg=""):
+    alert_text = f"\n[{datetime.now().strftime('%H:%M:%S')}] 🌐 {type_name} ARBITRAGE FOUND!{risk_msg}\n"
     alert_text += f"Market: {q}\n"
     alert_text += f"Total Cost (Net): ${total:.3f} | Profit: {profit:.2f}%\n"
+    alert_text += f"Recommended Size: ${size:,.0f} (Kelly)\n"
     alert_text += f"Link: https://polymarket.com/event/{slug}\n"
     alert_text += "-" * 60 + "\n"
     print(alert_text)

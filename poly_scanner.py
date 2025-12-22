@@ -3,6 +3,7 @@ import argparse
 from datetime import datetime
 from poly_client import PolyClient
 import config
+from risk_manager import risk_manager
 
 # Global Instance
 poly = PolyClient()
@@ -11,6 +12,18 @@ def parse_p(p_str):
     """Convert Polymarket cents (ints/strings) to dollars."""
     try: return float(p_str) / 100.0
     except: return None
+
+def calculate_kelly_size(profit_pct):
+    """Calculate trade size based on Kelly Criterion (Conservative)."""
+    if profit_pct <= 0: return config.TARGET_TRADE_SIZE_USD
+    
+    # Simple version: Size scaled by edge
+    # Kelly Fraction (0.2) * Edge * Bankroll * Multiplier
+    # e.g. 0.2 * 0.02 * 10000 * 10 = 400 USD
+    size = config.BANKROLL_USD * (profit_pct / 100) * config.KELLY_FRACTION * 10
+    
+    # Clamp between target floor and max exposure
+    return max(config.TARGET_TRADE_SIZE_USD, min(size, config.MAX_EXPOSURE_PER_MARKET_USD))
 
 def get_vwap_price(order_list, target_usd):
     """Calculate the average price to fill target_usd by depth."""
@@ -69,7 +82,13 @@ def check_internal_arbitrage(market, ob):
                 total_cost = (y_price + n_price) * fee_multiplier
                 if total_cost < 1 - (min_profit / 100):
                     profit = (1 - total_cost) * 100
-                    print_alert("BINARY (NET)", question, total_cost, profit, slug, volume=volume)
+                    rec_size = calculate_kelly_size(profit)
+                    
+                    # Risk Check
+                    can_add, reason = risk_manager.can_add_position(slug, slug, rec_size)
+                    risk_msg = "" if can_add else f" [RISK WARNING: {reason}]"
+                    
+                    print_alert("BINARY (NET)", question, total_cost, profit, slug, volume=volume, size=rec_size, risk_msg=risk_msg)
         except: pass
             
     # Scenario 2: Multi-outcome
@@ -90,16 +109,18 @@ def check_internal_arbitrage(market, ob):
             total_cost = total_sum * fee_multiplier
             if total_cost < 1 - (min_profit / 100):
                 profit = (1 - total_cost) * 100
-                print_alert("MULTI (NET)", question, total_cost, profit, slug, details, volume=volume)
+                rec_size = calculate_kelly_size(profit)
+                print_alert("MULTI (NET)", question, total_cost, profit, slug, details, volume=volume, size=rec_size)
         except: pass
 
-def print_alert(type_name, q, total, profit, slug, details=None, volume=0):
+def print_alert(type_name, q, total, profit, slug, details=None, volume=0, size=0, risk_msg=""):
     icon = "🔥"
-    alert_text = f"\n[{datetime.now().strftime('%H:%M:%S')}] {icon} {type_name} ARBITRAGE FOUND!\n"
+    alert_text = f"\n[{datetime.now().strftime('%H:%M:%S')}] {icon} {type_name} ARBITRAGE FOUND!{risk_msg}\n"
     alert_text += f"Market: {q}\n"
     alert_text += f"Market Volume: ${volume:,.0f}\n"
     if details: alert_text += f"Details: {', '.join(details)}\n"
     alert_text += f"Total Cost: ${total:.3f} | Net Profit: {profit:.2f}%\n"
+    alert_text += f"Recommended Size: ${size:,.0f} (Kelly)\n"
     alert_text += f"Link: https://polymarket.com/event/{slug}\n"
     alert_text += "-" * 60 + "\n"
     
