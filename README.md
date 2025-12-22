@@ -23,7 +23,16 @@ Advanced bots for finding and verifying risk-free profit opportunities on Polyma
 - Finds discrepancies between Poly and Kalshi.
 - Semantic matching with 0.82+ confidence requirement.
 
-### 3. Backtesting & Archive (`backtest.py`)
+### 3. High-Frequency Scanner (`hf_scanner.py`)
+- Targeted "Sniper" for 15-minute "Up or Down" markets.
+- High-speed polling (0.2s) for instant execution.
+
+### 4. Maker "Spread" Scanner (`maker_scanner.py` & `maker_scanner_general.py`)
+- **HF Lane**: Checks "Up/Down" markets every 1s for spreads.
+- **General Lane**: Scans top 200 markets every 15s for "lazy" spreads (NFL, Politics).
+- Strategy: Identifies when `Best Bid YES + Best Bid NO < 1.00`.
+
+### 5. Backtesting & Archive (`backtest.py`)
 - **Collect**: `python backtest.py --collect` (Archives snapshots to `market_archive.jsonl`).
 - **Analyze**: `python backtest.py --analyze market_archive.jsonl` (Replays logic on data).
 
@@ -41,13 +50,13 @@ Modify this file to adjust your risk profile:
 ## ☁️ Deployment on VM (92.5.20.42)
 
 ```bash
-# Start the suite in the background
-nohup ./venv/bin/python3 -u poly_scanner.py > poly.log 2>&1 &
-nohup ./venv/bin/python3 -u cross_scanner.py > cross.log 2>&1 &
-
-# (Optional) Start the data collector for backtesting
-nohup ./venv/bin/python3 -u backtest.py --collect > collector.log 2>&1 &
+# Start the full suite (All 7 Bots)
+./start_bot.sh
 ```
+
+### 📊 Monitoring Results
+1.  **Unified Opportunities**: `tail -f ~/polymarket-bot/opportunities.log`
+2.  **Specific Logs**: `poly.log`, `cross.log`, `hf.log`, `maker_hf.log`, `maker_gen.log`
 
 ### 📊 Monitoring Results
 1.  **Scan Logic**: `tail -f poly.log` / `tail -f cross.log`
