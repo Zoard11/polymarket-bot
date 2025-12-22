@@ -4,9 +4,11 @@ import concurrent.futures
 from datetime import datetime
 from poly_client import PolyClient
 import config
+from trade_executor import TradeExecutor
 
 # Global Instance
 poly = PolyClient()
+executor = TradeExecutor(poly)
 
 # General Maker Settings (from config)
 MAKER_POLL_INTERVAL = 15.0     # Slower poll for 200 markets
@@ -45,6 +47,9 @@ def check_maker_opportunity(market, obs):
     
     if potential_profit_pct >= config.MAKER_MIN_PROFIT_PCT:
         print_maker_alert(question, current_implied_cost, potential_profit_pct, y_bid, n_bid, slug)
+        
+        # TRIGGER EXECUTION (MOCK)
+        executor.place_maker_orders(market, y_bid, n_bid)
 
 def print_maker_alert(q, cost, profit, y_bid, n_bid, slug):
     alert_text = f"\n[{datetime.now().strftime('%H:%M:%S')}] [MAKER-GEN] 🐢 SLOW SPREAD FOUND!\n"

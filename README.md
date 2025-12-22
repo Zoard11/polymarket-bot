@@ -49,14 +49,30 @@ Modify this file to adjust your risk profile:
 
 ## ☁️ Deployment on VM (92.5.20.42)
 
+### 🔄 Updating to Latest Version
+Run these commands to pull changes and restart the bots:
 ```bash
-# Start the full suite (All 7 Bots)
+cd ~/polymarket-bot
+git fetch origin
+git reset --hard origin/main
+chmod +x start_bot.sh
 ./start_bot.sh
 ```
 
-### 📊 Monitoring Results
-1.  **Unified Opportunities**: `tail -f ~/polymarket-bot/opportunities.log`
-2.  **Specific Logs**: `poly.log`, `cross.log`, `hf.log`, `maker_hf.log`, `maker_gen.log`
+One-liner:
+````bash
+cd ~/polymarket-bot && git fetch origin && git reset --hard origin/main && chmod +x start_bot.sh && ./start_bot.sh
+```
+
+### � Viewing Logs
+```bash
+# Unified Opportunities
+tail -f ~/polymarket-bot/opportunities.log
+
+# Specific Logs
+tail -f poly.log
+tail -f maker_gen.log
+```
 
 ### 📊 Monitoring Results
 1.  **Scan Logic**: `tail -f poly.log` / `tail -f cross.log`

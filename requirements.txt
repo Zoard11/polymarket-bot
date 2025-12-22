@@ -3,3 +3,4 @@ websocket-client
 python-dotenv
 sentence-transformers
 torch
+py-clob-client
