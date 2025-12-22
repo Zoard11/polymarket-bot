@@ -5,6 +5,8 @@ from ws_client import poly_ws
 
 GAMMA_API_URL = "https://gamma-api.polymarket.com"
 
+CLOB_API_URL = "https://clob.polymarket.com"
+
 class PolyClient:
     def __init__(self):
         self.session = requests.Session()
@@ -42,14 +44,23 @@ class PolyClient:
             except: pass
         return []
 
-    def get_orderbook(self, market_id, asset_id=None):
-        """Fetch orderbook from REST API or WebSocket cache if available."""
-        if config.WS_ENABLED and asset_id in poly_ws.orderbooks:
-            return poly_ws.orderbooks[asset_id]
+    def get_orderbook(self, token_id, market_id=None):
+        """Fetch orderbook for a specific token ID from CLOB REST API or WebSocket."""
+        # Safety for older calls passing market_id first
+        if not token_id and market_id:
+            token_id = market_id
             
-        url = f"{GAMMA_API_URL}/markets/{market_id}/orderbook"
-        resp = self._request_with_retries(url, timeout=5)
+        if config.WS_ENABLED and token_id in poly_ws.orderbooks:
+            return poly_ws.orderbooks[token_id]
+            
+        url = f"{CLOB_API_URL}/book"
+        params = {"token_id": token_id}
+        resp = self._request_with_retries(url, params=params, timeout=5)
         if resp:
-            try: return resp.json()
+            try: 
+                data = resp.json()
+                # CLOB returns { 'bids': [...], 'asks': [...] }
+                # We normalize it to a consistent format if needed
+                return data
             except: pass
         return None

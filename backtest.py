@@ -32,43 +32,58 @@ class BacktestEngine:
             "kalshi_markets": k_active
         }
         
-        print(f"  - Fetching orderbooks for {len(p_active)} Poly markets using 10 threads...")
+        # We need to collect orderbooks for YES and NO tokens separately
+        all_token_tasks = []
+        for m in p_active:
+            token_ids = json.loads(m.get('clobTokenIds', '[]'))
+            for tid in token_ids:
+                all_token_tasks.append((m, tid))
+
+        print(f"  - Fetching {len(all_token_tasks)} orderbooks for {len(p_active)} Poly markets...")
+        
+        token_to_ob = {}
         with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
-            # Map future to market object
-            future_to_market = {executor.submit(self.poly.get_orderbook, m['id']): m for m in p_active}
+            future_to_tid = {executor.submit(self.poly.get_orderbook, tid): tid for _, tid in all_token_tasks}
             
             count = 0
-            for future in concurrent.futures.as_completed(future_to_market):
+            for future in concurrent.futures.as_completed(future_to_tid):
                 count += 1
-                market = future_to_market[future]
+                tid = future_to_tid[future]
                 try:
                     ob = future.result()
-                    if ob:
-                        snapshot["poly_markets"].append({
-                            "market": market,
-                            "orderbook": ob
-                        })
-                except Exception as e:
-                    print(f"\n    Error fetching {market['slug']}: {e}")
+                    if ob: token_to_ob[tid] = ob
+                except: pass
                 
-                if count % 10 == 0 or count == len(p_active):
-                    print(f"    Progress: {count}/{len(p_active)}...", end='\r', flush=True)
+                if count % 20 == 0 or count == len(all_token_tasks):
+                    print(f"    Progress: {count}/{len(all_token_tasks)}...", end='\r', flush=True)
+
+        # Re-assemble into snapshots
+        for m in p_active:
+            token_ids = json.loads(m.get('clobTokenIds', '[]'))
+            outcomes = m.get('outcomes', [])
+            
+            market_obs = {}
+            # Map common names to YES/NO for binary logic
+            if len(token_ids) == 2:
+                market_obs['yes'] = token_to_ob.get(token_ids[0])
+                market_obs['no'] = token_to_ob.get(token_ids[1])
+            
+            # Also store with token_ids as keys for multi-outcome
+            market_obs['tokens'] = {tid: token_to_ob.get(tid) for tid in token_ids}
+            
+            snapshot["poly_markets"].append({
+                "market": m,
+                "orderbook": market_obs
+            })
 
         print(f"\n  - Poly Snapshot Complete: {len(snapshot['poly_markets'])} markets captured.")
-        print(f"  - Kalshi Snapshot Complete: {len(snapshot['kalshi_markets'])} markets captured.")
+        print(f"  - Kalshi: {len(snapshot['kalshi_markets'])} markets")
         return snapshot
 
     def run_collector(self, interval_sec=300, once=False):
         """Continuously collect data and append to jsonl file."""
         print(f"Data Collector started. Saving to {ARCHIVE_FILE}. Interval: {interval_sec}s")
         
-        # Ensure file exists
-        try:
-            with open(ARCHIVE_FILE, 'a', encoding='utf-8') as f:
-                pass
-        except Exception as e:
-            print(f"Initial file creation failed: {e}")
-
         while True:
             try:
                 snap = self.collect_snapshot()
@@ -100,7 +115,6 @@ class BacktestEngine:
                     p_markets_data = snap.get('poly_markets', [])
                     current_snap_profit = 0
                     
-                    # 1. Internal Poly Arbs logic
                     for data in p_markets_data:
                         m = data['market']
                         ob = data['orderbook']
@@ -124,12 +138,13 @@ class BacktestEngine:
         print("="*40)
 
     def _check_internal_sim(self, m, ob):
+        # Simulated check using YES/NO books
         try:
-            clob_ids = json.loads(m.get('clobTokenIds', '[]'))
-            if len(clob_ids) != 2: return None
+            y_book = ob.get('yes', {}).get('asks', [])
+            n_book = ob.get('no', {}).get('asks', [])
             
-            p1 = calc_vwap(ob.get('yes', []), config.TARGET_TRADE_SIZE_USD / 2)
-            p2 = calc_vwap(ob.get('no', []), config.TARGET_TRADE_SIZE_USD / 2)
+            p1 = calc_vwap(y_book, config.TARGET_TRADE_SIZE_USD / 2)
+            p2 = calc_vwap(n_book, config.TARGET_TRADE_SIZE_USD / 2)
             
             if not p1 or not p2: return None
             
