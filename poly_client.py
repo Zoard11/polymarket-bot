@@ -1,3 +1,5 @@
+import requests
+import time
 import config
 from ws_client import poly_ws
 
