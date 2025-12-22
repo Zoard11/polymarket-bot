@@ -9,43 +9,57 @@ from kalshi_client import KalshiClient
 MIN_PROFIT_PCT = 1.0          
 MIN_VOLUME_24H = 10000        
 MIN_LIQUIDITY_USD = 100       
-POLL_INTERVAL = 15            
+POLL_INTERVAL = 30  # Increased for NLP overhead
 MAX_P_MARKETS = 100           
 MAX_K_MARKETS = 1000          
 
 # Global Instances
 poly = PolyClient()
 kalshi = KalshiClient()
+nlp_model = None
+
+def get_nlp_model():
+    global nlp_model
+    if nlp_model is None:
+        try:
+            from sentence_transformers import SentenceTransformer
+            print("Loading NLP Model (all-MiniLM-L6-v2) for high-accuracy matching...")
+            nlp_model = SentenceTransformer('all-MiniLM-L6-v2')
+        except Exception as e:
+            print(f"NLP model loading failed: {e}")
+    return nlp_model
 
 def parse_p(p_str):
     """Convert Polymarket cents (ints/strings) to dollars."""
     try: return float(p_str) / 100.0
     except: return None
 
-def get_word_set(text):
-    if not text: return set()
-    return set(text.lower().replace('?', '').replace('.', '').split())
-
-def find_kalshi_match(poly_question, kalshi_markets):
-    poly_words = get_word_set(poly_question)
-    if len(poly_words) < 3: return None
+def find_kalshi_match_semantic(poly_market, kalshi_markets, k_embeddings=None):
+    """Use Ticker overlap + Semantic similarity (NLP) to match markets."""
+    poly_slug = poly_market.get('slug', '').lower()
+    poly_question = poly_market.get('question', '').lower()
     
-    best_match = None
-    max_similarity = 0.4 
-    
+    # 1. Fast path: ticker/slug overlap
     for km in kalshi_markets:
-        km_text = (km.get('title', '') + " " + km.get('subtitle', '')).strip()
-        km_words = get_word_set(km_text)
-        
-        intersection = poly_words.intersection(km_words)
-        union = poly_words.union(km_words)
-        similarity = len(intersection) / len(union) if union else 0
-        
-        if similarity > max_similarity:
-            max_similarity = similarity
-            best_match = km
-            
-    return best_match
+        k_ticker = (km.get('ticker') or km.get('event_ticker', '')).lower()
+        if poly_slug and k_ticker and (poly_slug in k_ticker or k_ticker in poly_slug):
+            return km  
+    
+    # 2. Semantic Fallback (NLP)
+    model = get_nlp_model()
+    if model is None or k_embeddings is None: return None
+    
+    try:
+        from sentence_transformers import util
+        p_emb = model.encode(poly_question, convert_to_tensor=True)
+        # Cosine similarity
+        hits = util.cos_sim(p_emb, k_embeddings)[0]
+        best_idx = hits.argmax()
+        if hits[best_idx] > 0.82: # High threshold for high confidence
+            return kalshi_markets[best_idx]
+    except: pass
+    
+    return None
 
 def check_arbitrage(market, ob):
     """Check for arbitrage opportunities on a single market (YES+NO < 1)."""
@@ -106,7 +120,6 @@ def check_cross_platform_arb(poly_market, poly_ob, kalshi_market):
     p_no_best = min(no_list, key=lambda x: float(x['price'])) if no_list else None
     
     if not p_yes_best or not p_no_best: return
-    
     p_yes_ask = parse_p(p_yes_best['price'])
     p_no_ask = parse_p(p_no_best['price'])
     
@@ -114,35 +127,30 @@ def check_cross_platform_arb(poly_market, poly_ob, kalshi_market):
     k_data = kalshi.get_market_orderbook(kalshi_market.get('ticker'))
     if not k_data: return
     
-    k_yes_ask_data = k_data.get('yes_ask')
-    k_no_ask_data = k_data.get('no_ask')
+    k_yes = k_data.get('yes_ask')
+    k_no = k_data.get('no_ask')
+    if not k_yes or not k_no: return
     
-    if not k_yes_ask_data or not k_no_ask_data: return
-    
-    k_yes_ask = float(k_yes_ask_data[0]) / 100.0
-    k_no_ask = float(k_no_ask_data[0]) / 100.0
+    k_yes_ask = float(k_yes[0]) / 100.0
+    k_no_ask = float(k_no[0]) / 100.0
     
     # 3. Arbitrage Checks
-    # Case A: Buy Poly YES + Kalshi NO
+    # Poly YES + Kalshi NO
     total_a = p_yes_ask + k_no_ask
     if total_a < 1 - (MIN_PROFIT_PCT / 100):
-        # Liquidity check
-        p_liq = p_yes_ask * float(p_yes_best.get('size', 0))
-        k_liq = k_no_ask * float(k_no_ask_data[1])
-        if p_liq >= MIN_LIQUIDITY_USD and k_liq >= MIN_LIQUIDITY_USD:
+        if (p_yes_ask * float(p_yes_best.get('size', 0)) >= MIN_LIQUIDITY_USD and 
+            k_no_ask * float(k_no[1]) >= MIN_LIQUIDITY_USD):
             print_alert("CROSS (Poly YES + Kalshi NO)", poly_market['question'], total_a, (1-total_a)*100, poly_market['slug'])
 
-    # Case B: Buy Kalshi YES + Poly NO
+    # Kalshi YES + Poly NO
     total_b = k_yes_ask + p_no_ask
     if total_b < 1 - (MIN_PROFIT_PCT / 100):
-        # Liquidity check
-        k_liq = k_yes_ask * float(k_yes_ask_data[1])
-        p_liq = p_no_ask * float(p_no_best.get('size', 0))
-        if k_liq >= MIN_LIQUIDITY_USD and p_liq >= MIN_LIQUIDITY_USD:
+        if (k_yes_ask * float(k_yes[1]) >= MIN_LIQUIDITY_USD and 
+            p_no_ask * float(p_no_best.get('size', 0)) >= MIN_LIQUIDITY_USD):
             print_alert("CROSS (Kalshi YES + Poly NO)", poly_market['question'], total_b, (1-total_b)*100, poly_market['slug'])
 
 def print_alert(type_name, q, total, profit, slug, details=None):
-    icon = "🔥" if type_name == "BINARY" else "🚨"
+    icon = "🔥" if "CROSS" not in type_name else "🌐"
     print(f"\n[{datetime.now().strftime('%H:%M:%S')}] {icon} {type_name} ARBITRAGE FOUND!")
     print(f"Market: {q}")
     if details: print(f"Details: {', '.join(details)}")
@@ -150,21 +158,29 @@ def print_alert(type_name, q, total, profit, slug, details=None):
     print(f"Link: https://polymarket.com/event/{slug}")
     print("-" * 60)
 
-
 def main():
-    parser = argparse.ArgumentParser(description="Polymarket & Kalshi Arbitrage Scanner")
+    parser = argparse.ArgumentParser(description="Polymarket & Kalshi NLP Arbitrage Scanner")
     parser.add_argument("--once", action="store_true", help="Run the scan once and exit")
     args = parser.parse_args()
 
-    print("Polymarket & Kalshi Arbitrage Scanner (Refactored)")
+    print("Polymarket & Kalshi Arbitrage Scanner (Advanced NLP Mode)")
     print(f"Settings: Min Profit {MIN_PROFIT_PCT}%, Min Liquidity ${MIN_LIQUIDITY_USD}\n")
+    
+    model = get_nlp_model()
     
     while True:
         try:
             p_active = poly.fetch_active_markets(MIN_VOLUME_24H, MAX_P_MARKETS)
             k_active = kalshi.fetch_active_markets(MAX_K_MARKETS)
             
-            print(f"[{datetime.now().strftime('%H:%M:%S')}] Scanning {len(p_active)} Poly vs {len(k_active)} Kalshi markets...")
+            # Pre-compute Kalshi embeddings
+            k_embeddings = None
+            if model and k_active:
+                print(f"[{datetime.now().strftime('%H:%M:%S')}] Encoding {len(k_active)} Kalshi markets...")
+                k_texts = [(km.get('title', '') + " " + km.get('subtitle', '')).lower() for km in k_active]
+                k_embeddings = model.encode(k_texts, convert_to_tensor=True)
+
+            print(f"[{datetime.now().strftime('%H:%M:%S')}] Scanning {len(p_active)} Poly vs {len(k_active)} Kalshi...")
             
             for market in p_active:
                 ob = poly.get_orderbook(market['id'])
@@ -172,8 +188,8 @@ def main():
                 
                 check_arbitrage(market, ob)
                 
-                # Cross-Platform Check
-                k_match = find_kalshi_match(market.get('question'), k_active)
+                # Semantic NLP Match
+                k_match = find_kalshi_match_semantic(market, k_active, k_embeddings)
                 if k_match:
                     check_cross_platform_arb(market, ob, k_match)
             
