@@ -4,6 +4,7 @@ from datetime import datetime
 from poly_client import PolyClient
 import config
 from risk_manager import risk_manager
+from ws_client import poly_ws
 
 # Global Instance
 poly = PolyClient()
@@ -142,15 +143,31 @@ def main():
     while True:
         try:
             p_active = poly.fetch_active_markets(config.MIN_VOLUME_24H, config.MAX_P_MARKETS)
+            
+            # Subscribe to WS if enabled
+            if config.WS_ENABLED:
+                asset_ids = []
+                for m in p_active:
+                    # Get asset IDs from market data (clobTokenIds)
+                    token_ids = m.get('clobTokenIds')
+                    if token_ids: asset_ids.extend(token_ids)
+                if asset_ids: 
+                    if not poly_ws.ws: poly_ws.start()
+                    poly_ws.subscribe(list(set(asset_ids)))
+
             print(f"[{datetime.now().strftime('%H:%M:%S')}] Monitoring {len(p_active)} Polymarket events...")
             
             for market in p_active:
-                ob = poly.get_orderbook(market['id'])
+                # Pass first clob token ID as asset_id proxy for cache check
+                token_ids = market.get('clobTokenIds')
+                asset_id = token_ids[0] if token_ids else None
+                ob = poly.get_orderbook(market['id'], asset_id=asset_id)
                 if ob:
                     check_internal_arbitrage(market, ob)
             
             if args.once: break
-            time.sleep(config.POLL_INTERVAL_POLY)
+            interval = config.POLL_INTERVAL_WS if config.WS_ENABLED else config.POLL_INTERVAL_POLY
+            time.sleep(interval)
         except KeyboardInterrupt: break
         except Exception as e:
             print(f"Loop error: {e}")

@@ -32,7 +32,6 @@ MIN_VOLUME_24H = 10000             # Minimum 24h volume for a market to be consi
 MAX_P_MARKETS = 200                # Max Polymarket events to fetch per cycle
 POLL_INTERVAL_POLY = 15            # Seconds between Polymarket scans
 
-# Cross-Platform Settings
-MAX_K_MARKETS = 300                # Max active Kalshi markets to fetch
-POLL_INTERVAL_CROSS = 60           # Seconds between cross-platform scans
-NLP_MATCH_THRESHOLD = 0.82         # Minimum cosine similarity for semantic matching
+# HFT / WebSocket Settings
+WS_ENABLED = True
+POLL_INTERVAL_WS = 0.1             # Sub-second check for cache-based logic

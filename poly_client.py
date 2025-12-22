@@ -1,6 +1,5 @@
-import requests
-import time
 import config
+from ws_client import poly_ws
 
 GAMMA_API_URL = "https://gamma-api.polymarket.com"
 
@@ -41,7 +40,11 @@ class PolyClient:
             except: pass
         return []
 
-    def get_orderbook(self, market_id):
+    def get_orderbook(self, market_id, asset_id=None):
+        """Fetch orderbook from REST API or WebSocket cache if available."""
+        if config.WS_ENABLED and asset_id in poly_ws.orderbooks:
+            return poly_ws.orderbooks[asset_id]
+            
         url = f"{GAMMA_API_URL}/markets/{market_id}/orderbook"
         resp = self._request_with_retries(url, timeout=5)
         if resp:
