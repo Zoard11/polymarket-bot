@@ -7,8 +7,14 @@ echo "--------------------------------------------------"
 echo "🚀 Starting Polymarket Arbitrage Bot Suite 🚀"
 echo "--------------------------------------------------"
 
-# Kill existing bot processes to avoid duplicates (avoiding system python processes)
+# Kill existing bot processes
 pkill -f "scanner.py|backtest.py"
+
+# Auto-Update (User Requested Compatibility)
+echo "🔄 Checking for updates..."
+git pull origin main
+source venv/bin/activate
+pip install -r requirements.txt
 
 # Standard Arbitrage Scanners
 echo "[1/5] Launching Poly Internal Scanner..."
