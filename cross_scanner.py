@@ -134,7 +134,7 @@ def check_cross_platform_arb(poly_market, poly_ob, kalshi_market):
             print_alert("CROSS (Kalshi YES + Poly NO)", poly_market['question'], total, profit, poly_market['slug'], size=rec_size, risk_msg=risk_msg)
 
 def print_alert(type_name, q, total, profit, slug, size=0, risk_msg=""):
-    alert_text = f"\n[{datetime.now().strftime('%H:%M:%S')}] 🌐 {type_name} ARBITRAGE FOUND!{risk_msg}\n"
+    alert_text = f"\n[{datetime.now().strftime('%H:%M:%S')}] [CROSS] 🌐 {type_name} ARBITRAGE FOUND!{risk_msg}\n"
     alert_text += f"Market: {q}\n"
     alert_text += f"Total Cost (Net): ${total:.3f} | Profit: {profit:.2f}%\n"
     alert_text += f"Recommended Size: ${size:,.0f} (Kelly)\n"

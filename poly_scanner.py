@@ -119,7 +119,7 @@ def check_internal_arbitrage(market, ob):
 
 def print_alert(type_name, q, total, profit, slug, details=None, volume=0, size=0, risk_msg=""):
     icon = "🔥"
-    alert_text = f"\n[{datetime.now().strftime('%H:%M:%S')}] {icon} {type_name} ARBITRAGE FOUND!{risk_msg}\n"
+    alert_text = f"\n[{datetime.now().strftime('%H:%M:%S')}] [POLY] {icon} {type_name} ARBITRAGE FOUND!{risk_msg}\n"
     alert_text += f"Market: {q}\n"
     alert_text += f"Market Volume: ${volume:,.0f}\n"
     if details: alert_text += f"Details: {', '.join(details)}\n"

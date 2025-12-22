@@ -64,14 +64,14 @@ def check_hf_arbitrage(market, obs):
             print_hf_alert(question, total_cost, profit, slug)
 
 def print_hf_alert(q, total, profit, slug):
-    alert_text = f"\n[{datetime.now().strftime('%H:%M:%S')}] ⚡ HF 15m ARBITRAGE!\n"
+    alert_text = f"\n[{datetime.now().strftime('%H:%M:%S')}] [HF] ⚡ 15m ARBITRAGE!\n"
     alert_text += f"Market: {q}\n"
     alert_text += f"Total Cost: ${total:.3f} | Profit: {profit:.2f}%\n"
     alert_text += f"Link: https://polymarket.com/event/{slug}\n"
     alert_text += "-" * 40 + "\n"
     print(alert_text)
     try:
-        with open('hf_opportunities.log', 'a', encoding='utf-8') as f:
+        with open('opportunities.log', 'a', encoding='utf-8') as f:
             f.write(alert_text)
     except: pass
 

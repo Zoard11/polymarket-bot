@@ -21,11 +21,15 @@ echo "[3/5] Launching Correlated Pairs Scanner..."
 nohup ./venv/bin/python3 -u correlated_scanner.py > correlated.log 2>&1 &
 
 # High-Frequency (15-min) Scanner
-echo "[4/5] Launching 15-Min HF Scanner..."
+echo "[4/6] Launching 15-Min HF Scanner..."
 nohup ./venv/bin/python3 -u hf_scanner.py > hf.log 2>&1 &
 
+# Maker / Spread Scanner
+echo "[5/6] Launching Maker Strategy Scanner..."
+nohup ./venv/bin/python3 -u maker_scanner.py > maker.log 2>&1 &
+
 # Data Collector for Backtesting
-echo "[5/5] Launching Backtest Data Collector..."
+echo "[6/6] Launching Backtest Data Collector..."
 nohup ./venv/bin/python3 -u backtest.py --collect --interval 300 > backtest_collector.log 2>&1 &
 
 echo "--------------------------------------------------"
