@@ -49,7 +49,11 @@ def check_maker_opportunity(market, obs):
         print_maker_alert(question, current_implied_cost, potential_profit_pct, y_bid, n_bid, slug)
         
         # TRIGGER EXECUTION (MOCK)
-        executor.place_maker_orders(market, y_bid, n_bid)
+        print(f"[DEBUG] Triggering TradeExecutor for {slug}...") # Re-added for visibility
+        try:
+            executor.place_maker_orders(market, y_bid, n_bid)
+        except Exception as e:
+            print(f"❌ EXECUTION CRASHED: {e}")
 
 def print_maker_alert(q, cost, profit, y_bid, n_bid, slug):
     alert_text = f"\n[{datetime.now().strftime('%H:%M:%S')}] [MAKER-GEN] 🐢 SLOW SPREAD FOUND!\n"
