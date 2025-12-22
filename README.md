@@ -14,27 +14,31 @@ This bot monitors high-volume binary markets on Polymarket to find "Dutch Book" 
 
 ## 🐧 WSL (Linux) Setup
 
-If you are running in WSL and encounter `pip: command not found`, follow these steps:
+If you are running in WSL and encounter `externally-managed-environment`, use a **Virtual Environment**:
 
-1. **Update package list**:
+1. **Install venv support**:
    ```bash
    sudo apt update
+   sudo apt install python3-venv
    ```
 
-2. **Install pip**:
+2. **Create and Activate a Virtual Environment**:
    ```bash
-   sudo apt install python3-pip
+   python3 -m venv venv
+   source venv/bin/activate
    ```
 
-3. **Install dependencies**:
+3. **Install dependencies inside the venv**:
    ```bash
-   python3 -m pip install -r requirements.txt
+   pip install -r requirements.txt
    ```
 
 4. **Run the scanner**:
    ```bash
    python3 scanner.py
    ```
+
+*To exit the virtual environment later, just type `deactivate`.*
 
 ## 💻 Usage
 
