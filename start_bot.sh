@@ -13,8 +13,10 @@ pkill -f "scanner.py|backtest.py"
 # Auto-Update (User Requested Compatibility)
 echo "🔄 Checking for updates..."
 git pull origin main
-source venv/bin/activate
-pip install -r requirements.txt
+
+# Install dependencies (using venv python directly, no activation needed)
+echo "📦 Installing dependencies..."
+./venv/bin/pip install -q -r requirements.txt
 
 # Standard Arbitrage Scanners (DISABLED - No Trading Integration)
 # echo "[1/5] Launching Poly Internal Scanner..."
@@ -39,7 +41,7 @@ echo "[7/7] Launching Backtest Data Collector..."
 nohup ./venv/bin/python3 -u backtest.py --collect --interval 300 > backtest_collector.log 2>&1 &
 
 echo "--------------------------------------------------"
-echo "✅ All bots are running in the background."
+echo "✅ Trading bot is running in the background."
 echo "Use 'pgrep -af python' to verify processes."
-echo "Use 'tail -f <log_name>.log' to monitor."
+echo "Use 'tail -f maker_gen.log' to monitor."
 echo "--------------------------------------------------"
