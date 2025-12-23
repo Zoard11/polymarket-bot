@@ -160,7 +160,10 @@ class TradeExecutor:
                     "size_no": shares_no,
                     "timestamp": datetime.now(),
                     "market_question": market.get('question'),
-                    "chased": False
+                    "chased": False,
+                    "market_id": market_id,
+                    "event_id": event_id,
+                    "size_usd": size_usd
                 })
 
                 # Record successful trade in RiskManager for capital tracking
@@ -200,6 +203,8 @@ class TradeExecutor:
 
                 if fill_a and fill_b:
                     logger.info(f"✅ Hedge Fully Filled: {pair['market_question'][:30]}")
+                    # SIGNAL RISK MANAGER: Free up the slot and capital
+                    risk_manager.release_trade(pair['event_id'], pair['market_id'], pair['size_usd'])
                     continue # Successfully closed!
 
                 # 2. Check for "Hanging" state (One filled, one not) after timeout
@@ -233,6 +238,8 @@ class TradeExecutor:
                         if resp.get('success'):
                             logger.info(f"🛡️ CHASE SUCCESSFUL: {side_name} filled via Market Order.")
                             pair['chased'] = True
+                            # SIGNAL RISK MANAGER: Free up the slot and capital
+                            risk_manager.release_trade(pair['event_id'], pair['market_id'], pair['size_usd'])
                             continue
                         else:
                             logger.error(f"🚨 CHASE FAILED: {resp.get('errorMsg')}")
@@ -245,7 +252,9 @@ class TradeExecutor:
                     try:
                         self.clob.cancel(pair['yes_id'])
                         self.clob.cancel(pair['no_id'])
-                        continue # Removed from active tracking, freeing up capital
+                        # SIGNAL RISK MANAGER: Free up the slot and capital
+                        risk_manager.release_trade(pair['event_id'], pair['market_id'], pair['size_usd'])
+                        continue # Removed from active tracking
                     except Exception as e:
                         logger.error(f"❌ Rotation Cleanup Failed: {e}")
 
