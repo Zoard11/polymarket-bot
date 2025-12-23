@@ -46,10 +46,10 @@ HF_LIMIT = 50                      # Max high-frequency markets to track
 
 # Maker Strategy Settings
 MAKER_TRADE_SIZE_USD = 10.0        # Total per cycle ($5 YES + $5 NO to meet exchange minimums)
-MAKER_MIN_PROFIT_PCT = 1.0         # Minimum spread profit to trigger alert (e.g. 1.0%)
+MAKER_MIN_PROFIT_PCT = 0.5         # High Activity: 0.5% (Better chance for fills)
 MAKER_ALLOW_DEAD_MARKETS = False   # If True, allows markets with 0 bids (Cost=0) -> 100% spread
 MAKER_MIN_SIDE_PRICE = 0.01        # Minimum bid on EACH side to consider market "Alive"
-MAKER_MAX_QUEUE_DEPTH_USD = 500    # If >$500 in bids at same price, skip (too long line)
+MAKER_MAX_QUEUE_DEPTH_USD = 200    # High Activity: $200 (Ensures we are always at the front)
 LIVE_TRADING = True                # SET TO TRUE FOR REAL ORDER PLACEMENT
 
 # Hedge Chaser Settings (Delta Risk Protection)
