@@ -38,7 +38,7 @@ REST_BACKOFF_SEC = 30              # Silent cooling period after 429 errors
 REST_COOLDOWN_LONG_SEC = 300       # 5-minute deep cooling for 403 blocks
 
 # Scanner Settings
-MIN_VOLUME_24H = 50000             # Minimum 24h volume to ensure active trading
+MIN_VOLUME_24H = 25000             # Minimum 24h volume (Balanced: $25k is enough for fills)
 MAX_P_MARKETS = 200                # Max Polymarket events to fetch per cycle
 POLL_INTERVAL_POLY = 15            # Seconds between Polymarket scans
 HF_KEYWORDS = ["Up or Down", "15m", "15-minute"] # Keywords to force-include regardless of volume

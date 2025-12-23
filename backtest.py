@@ -198,6 +198,43 @@ class BacktestEngine:
         return False
 
     # Simulation Wrappers (Adapters)
+    def _sim_maker(self, m, ob):
+        try:
+            # 0. High-Volume Check (New!)
+            vol = float(m.get('volume24hr', 0))
+            min_vol = getattr(config, 'MIN_VOLUME_24H', 10000)
+            if vol < min_vol:
+                return False
+
+            y_bids = ob.get('yes', {}).get('bids', [])
+            n_bids = ob.get('no', {}).get('bids', [])
+            
+            y_bid = float(y_bids[0]['price']) if y_bids else 0
+            n_bid = float(n_bids[0]['price']) if n_bids else 0
+            
+            # 1. Check Dead Markets (Low Liquidity)
+            if not config.MAKER_ALLOW_DEAD_MARKETS:
+                # Must have at least X cents of bids on both sides to be "Alive"
+                if y_bid < config.MAKER_MIN_SIDE_PRICE or n_bid < config.MAKER_MIN_SIDE_PRICE: 
+                    return False
+
+            # 2. Queue Depth Check (New!)
+            max_depth = getattr(config, 'MAKER_MAX_QUEUE_DEPTH_USD', 500)
+            y_depth = sum(float(o.get('size', 0)) * y_bid for o in y_bids if float(o.get('price', 0)) == y_bid)
+            n_depth = sum(float(o.get('size', 0)) * n_bid for o in n_bids if float(o.get('price', 0)) == n_bid)
+            
+            if y_depth > max_depth or n_depth > max_depth:
+                return False
+
+            # 3. Check Profit Threshold from Config
+            cost = y_bid + n_bid
+            threshold = 1.0 - (config.MAKER_MIN_PROFIT_PCT / 100.0)
+            
+            if cost < threshold:
+                return True
+        except: pass
+        return False
+
     def _sim_poly_internal(self, m, ob):
         try:
             y_book = ob.get('yes', {}).get('asks', [])
@@ -207,27 +244,6 @@ class BacktestEngine:
             if p1 and p2 and (p1 + p2 < 0.99): return True
         except: pass
         return False
-
-    def _sim_maker(self, m, ob):
-        try:
-            y_bid = float(ob.get('yes', {}).get('bids', [])[0]['price'])
-            n_bid = float(ob.get('no', {}).get('bids', [])[0]['price'])
-            
-            # 1. Check Dead Markets (Low Liquidity)
-            if not config.MAKER_ALLOW_DEAD_MARKETS:
-                # Must have at least X cents of bids on both sides to be "Alive"
-                if y_bid < config.MAKER_MIN_SIDE_PRICE or n_bid < config.MAKER_MIN_SIDE_PRICE: 
-                    return False
-
-            # 2. Check Profit Threshold from Config
-            cost = y_bid + n_bid
-            threshold = 1.0 - (config.MAKER_MIN_PROFIT_PCT / 100.0)
-            
-            if cost < threshold:
-                return True
-        except: pass
-        return False
-
     def _sim_hf(self, m, ob):
         # HF looks for 'Up or Down' keywords and fast arb
         if "Up or Down" not in m.get('question', ''): return False
