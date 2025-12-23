@@ -111,6 +111,8 @@ def main():
     print("🚀 Speed-Optimized Maker Strategy Scanner (WebSocket-First) Started...")
     
     cached_markets = []
+    last_market_refresh = 0
+    MARKET_REFRESH_SEC = getattr(config, 'MARKET_REFRESH_SEC', 600)
     last_hedge_check = 0
     HEDGE_CHECK_INTERVAL = getattr(config, 'HEDGE_CHECK_INTERVAL_SEC', 30)
 

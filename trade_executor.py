@@ -77,7 +77,11 @@ class TradeExecutor:
             logger.warning(f"⚠️ Trade aborted: Target size ${size_usd} is below the floor of ${min_size}.")
             return
             
-        # Calculate Sizes
+        # Calculate Sizes (Safety Check for Zero Bids)
+        if y_bid <= 0 or n_bid <= 0:
+            logger.warning(f"⚠️ Trade aborted: Zero bid detected (YES: {y_bid}, NO: {n_bid})")
+            return
+
         shares_yes = int((size_usd / 2) / y_bid)
         shares_no = int((size_usd / 2) / n_bid)
         
@@ -212,12 +216,10 @@ class TradeExecutor:
                         try: self.clob.cancel(target_id)
                         except: pass
                         
-                        # STEP 2: Place a MARKET ORDER (Aggressive Taker) to close the gap
-                        # We use a very high/low price to ensure immediate fill (taking the book)
-                        chase_price = 0.99 if side_name == "YES" else 0.99
-                        # Technically the CLOB API 'create_market_order' handles this better
-                        # but we use a marketable limit order for safety if FOK isn't available
-                        chase_args = OrderArgs(price=0.99, size=int(target_size), side="BUY", token_id=target_token)
+                        # STEP 2: Place a MARKET-LIKE ORDER (Aggressive Taker) to close the gap
+                        # We use a cap from config to ensure we don't overpay for a hedge.
+                        chase_price = getattr(config, 'MAX_CHASE_PRICE', 0.99)
+                        chase_args = OrderArgs(price=chase_price, size=int(target_size), side="BUY", token_id=target_token)
                         signed_chase = self.clob.create_order(chase_args)
                         resp = self.clob.post_order(signed_chase)
                         
