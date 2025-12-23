@@ -45,11 +45,12 @@ MAKER_TRADE_SIZE_USD = 10.0        # Total per cycle ($5 YES + $5 NO to meet exc
 MAKER_MIN_PROFIT_PCT = 1.0         # Minimum spread profit to trigger alert (e.g. 1.0%)
 MAKER_ALLOW_DEAD_MARKETS = False   # If True, allows markets with 0 bids (Cost=0) -> 100% spread
 MAKER_MIN_SIDE_PRICE = 0.01        # Minimum bid on EACH side to consider market "Alive"
-LIVE_TRADING = True               # SET TO TRUE FOR REAL ORDER PLACEMENT
+LIVE_TRADING = True                # SET TO TRUE FOR REAL ORDER PLACEMENT
 
 # HFT / WebSocket Settings
 WS_ENABLED = True
-POLL_INTERVAL_WS = 0.5             # Loop frequency when WS is enabled (check cache)
+WS_MAX_AGE_SEC = 10                # Max age of WS data before falling back to REST
+POLL_INTERVAL_WS = 0.1             # Fast 10hz loop for WebSocket cache checking
 POLL_INTERVAL_CORR = 10            # Frequency for correlation/logical scanning
 
 # Cross-Platform Settings

@@ -61,8 +61,13 @@ class PolyClient:
 
     def get_orderbook(self, token_id):
         """Fetch orderbook for a specific token ID from CLOB REST API or WebSocket."""
-        if config.WS_ENABLED and token_id in poly_ws.orderbooks:
-            return poly_ws.orderbooks[token_id]
+        # Use WS cache if data is fresh AND connection is alive
+        ws_is_alive = poly_ws.ws and poly_ws.ws.sock and poly_ws.ws.sock.connected
+        max_age = getattr(config, 'WS_MAX_AGE_SEC', 10)
+        
+        if config.WS_ENABLED and ws_is_alive and token_id in poly_ws.orderbooks:
+            if poly_ws.is_fresh(token_id, max_age_sec=max_age):
+                return poly_ws.orderbooks[token_id]
             
         url = f"{CLOB_API_URL}/book"
         params = {"token_id": token_id}
@@ -82,16 +87,13 @@ class PolyClient:
             
             if not tids: return None
             
-            # Fetch in parallel for speed if multiple tokens
+            # Fetch orderbooks (Try Cache first, no threads needed for memory access)
             obs = {}
-            with concurrent.futures.ThreadPoolExecutor(max_workers=len(tids)) as executor:
-                future_to_tid = {executor.submit(self.get_orderbook, tid): tid for tid in tids}
-                for future in concurrent.futures.as_completed(future_to_tid):
-                    tid = future_to_tid[future]
-                    ob = future.result()
-                    if ob: obs[tid] = ob
+            for tid in tids:
+                ob = self.get_orderbook(tid)
+                if ob: obs[tid] = ob
             
-            if not obs: return None
+            if not obs or len(obs) < len(tids): return None
             
             # Normalize to yes/no for scanners
             final_obs = {'tokens': obs}

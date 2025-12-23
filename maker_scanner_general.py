@@ -88,44 +88,52 @@ def main():
     mode_str = "LIVE 🚀" if config.LIVE_TRADING else "MOCK (Dry Run) 🔎"
     print(f"🛡️  Trading Mode: {mode_str}")
 
-    print("🐢 General Maker Strategy Scanner (Wide Net - 200 Markets) Started...")
+    print("🚀 Speed-Optimized Maker Strategy Scanner (WebSocket-First) Started...")
+    
+    cached_markets = []
+    last_market_refresh = 0
+    MARKET_REFRESH_SEC = 600 # Refresh market list every 10 mins
     
     while True:
         try:
-            # Fetch ALL active markets
-            markets = poly.fetch_active_markets(limit=config.MAX_P_MARKETS)
-            
-            # No KW filter -> Scan everything
-            targets = markets
+            now = time.time()
+            # 1. Periodically fetch/refresh market list (REST - Slow handled safely)
+            if not cached_markets or (now - last_market_refresh > MARKET_REFRESH_SEC):
+                print(f"[{datetime.now().strftime('%H:%M:%S')}] 🔄 Refreshing market list from Gamma API...")
+                cached_markets = poly.fetch_active_markets(limit=config.MAX_P_MARKETS)
+                last_market_refresh = now
+                
+                # Subscribe to WebSocket for all market tokens
+                if config.WS_ENABLED and cached_markets:
+                    token_ids = []
+                    for m in cached_markets:
+                        tids = m.get('clobTokenIds')
+                        if isinstance(tids, str):
+                            import json
+                            tids = json.loads(tids)
+                        if tids: token_ids.extend(tids)
+                    if token_ids:
+                        poly_ws.subscribe(list(set(token_ids)))
+                        print(f"🌐 Subscribed to {len(token_ids)} tokens on WebSocket.")
 
-            # Subscribe to WebSocket for real-time updates (reduces REST API calls)
-            if config.WS_ENABLED:
-                token_ids = []
-                for m in targets:
-                    tids = m.get('clobTokenIds')
-                    if isinstance(tids, str):
-                        import json
-                        tids = json.loads(tids)
-                    if tids:
-                        token_ids.extend(tids)
-                if token_ids:
-                    poly_ws.subscribe(token_ids)
-
-            # Parallel Fetch
-            with concurrent.futures.ThreadPoolExecutor(max_workers=10) as thread_pool:
-                future_to_market = {thread_pool.submit(poly.get_market_orderbooks, m): m for m in targets}
-                for future in concurrent.futures.as_completed(future_to_market):
-                    market = future_to_market[future]
-                    obs = future.result()
-                    if obs:
-                        check_maker_opportunity(market, obs)
+            # 2. FAST PATH: Check opportunities
+            # With 3 CPUs, a serial loop for 200 dict lookups is actually FASTER 
+            # than the overhead of a ThreadPool.
+            for market in cached_markets:
+                obs = poly.get_market_orderbooks(market)
+                if obs:
+                    check_maker_opportunity(market, obs)
             
             if args.once: break
-            time.sleep(MAKER_POLL_INTERVAL)
+            
+            # Use small interval for WS cache check
+            interval = getattr(config, 'POLL_INTERVAL_WS', 0.5)
+            time.sleep(interval)
+
         except KeyboardInterrupt: break
         except Exception as e:
-            print(f"General Loop Error: {e}")
-            time.sleep(10)
+            print(f"[{datetime.now().strftime('%H:%M:%S')}] ⚠️ Loop error: {e}")
+            time.sleep(15) # Safety sleep on crash
 
 if __name__ == "__main__":
     main()
