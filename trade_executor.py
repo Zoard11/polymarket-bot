@@ -237,6 +237,18 @@ class TradeExecutor:
                         else:
                             logger.error(f"🚨 CHASE FAILED: {resp.get('errorMsg')}")
 
+                # 3. New STALE ORDER ROTATION (Capital Recycling)
+                # If BOTH sides are unfilled (0 shares matched) after 20 mins, cancel both.
+                stale_timeout = getattr(config, 'MAKER_ORDER_STALE_SEC', 1200)
+                if pair_age > stale_timeout and float(status_a.get('size_matched', 0)) == 0 and float(status_b.get('size_matched', 0)) == 0:
+                    logger.info(f"♻️ ROTATION: Canceling stale unfilled trade for '{pair['market_question'][:30]}'")
+                    try:
+                        self.clob.cancel(pair['yes_id'])
+                        self.clob.cancel(pair['no_id'])
+                        continue # Removed from active tracking, freeing up capital
+                    except Exception as e:
+                        logger.error(f"❌ Rotation Cleanup Failed: {e}")
+
                 remaining_pairs.append(pair)
             except Exception as e:
                 logger.error(f"❌ Error checking hedge pair: {e}")
