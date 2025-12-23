@@ -53,7 +53,7 @@ LIVE_TRADING = True                # SET TO TRUE FOR REAL ORDER PLACEMENT
 
 # Hedge Chaser Settings (Delta Risk Protection)
 HEDGE_CHASER_ENABLED = True        # If True, bot will market-buy the missing side of a fill
-HEDGE_TIMEOUT_SEC = 300            # Wait 5 minutes before "chasing" a partial fill
+HEDGE_TIMEOUT_SEC = 120            # Wait 2 minutes (Golden Middle) before "chasing" a partial fill
 HEDGE_CHECK_INTERVAL_SEC = 30      # How often to check order status
 MAX_CHASE_PRICE = 0.99             # Never pay more than 0.99 to close a hedge (Safety Cap)
 
