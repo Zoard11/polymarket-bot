@@ -94,11 +94,15 @@ class TradeExecutor:
             return
 
         # RISK MANAGER GATE: Check if we have capital and are within limits
-        market_id = market.get('conditionId') or market.get('id')
+        market_id = market.get('id') or market.get('conditionId')
         event_id = market.get('event_slug') or market.get('slug') or 'unknown'
+        
         can_trade, reason = risk_manager.can_add_position(event_id, market_id, size_usd)
         if not can_trade:
-            print(f"[{timestamp}] 🛡️ RISK GATE: Trade blocked - {reason}")
+            # Enhanced logging for the user
+            current_m_exp = risk_manager.market_exposure.get(market_id, 0)
+            print(f"[{timestamp}] 🛡️ RISK GATE: Trade blocked - {reason} "
+                  f"(Market Exposure: ${current_m_exp:.2f}, New Size: ${size_usd:.2f}, Limit: ${config.MAX_EXPOSURE_PER_MARKET_USD:.2f})")
             return
 
         # MARKET DE-DUPLICATION: Don't open a second hedge on the same market
