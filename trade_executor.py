@@ -166,6 +166,13 @@ class TradeExecutor:
                 # Record successful trade in RiskManager for capital tracking
                 risk_manager.record_trade(event_id, market_id, size_usd)
 
+        except Exception as e:
+            err_str = str(e)
+            print(f"[{timestamp}] ❌ Execution Error: {err_str}")
+            if "403" in err_str or "blocked" in err_str.lower():
+                print(f"[{timestamp}] 🚨 CRITICAL: CLOUDFLARE BLOCK DETECTED. HALTING STRATEGY.")
+                risk_manager.is_halted = True
+
     def check_and_chase_hedges(self):
         """
         Loops through active hedge pairs. If one side is filled and the other isn't 
