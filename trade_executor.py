@@ -69,6 +69,12 @@ class TradeExecutor:
         if size_usd is None:
             size_usd = config.TARGET_TRADE_SIZE_USD
             
+        # Check against safety floor
+        min_size = getattr(config, 'MIN_TRADE_SIZE_USD', 5.0)
+        if size_usd < min_size:
+            logger.warning(f"⚠️ Trade aborted: Target size ${size_usd} is below the floor of ${min_size}.")
+            return
+            
         # Calculate Sizes
         shares_yes = int((size_usd / 2) / y_bid)
         shares_no = int((size_usd / 2) / n_bid)

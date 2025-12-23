@@ -46,3 +46,7 @@ logs/
 *.jsonl
 market_archive.json
 *.remote
+analysis_results/
+analysis_results.txt
+analysis_results_realistic.txt
+analysis_full.txt

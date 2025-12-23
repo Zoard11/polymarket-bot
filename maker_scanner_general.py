@@ -55,9 +55,11 @@ def check_maker_opportunity(market, obs):
         print_maker_alert(question, current_implied_cost, potential_profit_pct, y_bid, n_bid, slug)
         
         # TRIGGER EXECUTION (MOCK)
-        print(f"[DEBUG] Triggering TradeExecutor for {slug}...") # Re-added for visibility
+        print(f"[DEBUG] Triggering TradeExecutor for {slug}...") 
         try:
-            executor.place_maker_orders(market, y_bid, n_bid)
+            # Use size from arguments or config
+            size = getattr(config, 'CURRENT_RUN_SIZE', config.MAKER_TRADE_SIZE_USD)
+            executor.place_maker_orders(market, y_bid, n_bid, size_usd=size)
         except Exception as e:
             print(f"❌ EXECUTION CRASHED: {e}")
 
@@ -77,7 +79,12 @@ def print_maker_alert(q, cost, profit, y_bid, n_bid, slug):
 def main():
     parser = argparse.ArgumentParser(description="General Maker Strategy Scanner")
     parser.add_argument("--once", action="store_true", help="Run once and exit")
+    parser.add_argument("--size", type=float, help=f"Set custom trade size (default: ${config.MAKER_TRADE_SIZE_USD})")
     args = parser.parse_args()
+
+    if args.size:
+        print(f"💰 Using custom trade size: ${args.size}")
+        config.CURRENT_RUN_SIZE = args.size
 
     print("🐢 General Maker Strategy Scanner (Wide Net - 200 Markets) Started...")
     

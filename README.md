@@ -33,8 +33,15 @@ Advanced bots for finding and verifying risk-free profit opportunities on Polyma
 - Strategy: Identifies when `Best Bid YES + Best Bid NO < 1.00`.
 
 ### 5. Backtesting & Archive (`backtest.py`)
-- **Collect**: `python backtest.py --collect` (Archives snapshots to `market_archive.jsonl`).
-- **Analyze**: `python backtest.py --analyze market_archive.jsonl` (Replays logic on data).
+- **Collect**: `python3 backtest.py --collect` (Archives snapshots to `market_archive.jsonl`).
+- **Analyze**: `python3 backtest.py --analyze market_archive.jsonl` (Replays logic on data).
+
+#### Running the Backtest
+To run the backtest using a virtual environment:
+
+1. Create a virtual environment: `python3 -m venv venv`
+2. Activate the virtual environment: `source venv/bin/activate`
+3. Run the analysis: `python3 backtest.py --analyze market_archive.jsonl`
 
 ---
 
