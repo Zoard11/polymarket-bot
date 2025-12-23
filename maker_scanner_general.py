@@ -41,7 +41,7 @@ def get_liquidity_depth(order_list, best_p):
     return depth
 
 def check_maker_opportunity(market, obs):
-    if not obs: return
+    if not obs: return "no_data"
     question = market.get('question', 'Unknown')
     slug = market.get('slug', '')
     
@@ -54,7 +54,7 @@ def check_maker_opportunity(market, obs):
     
     # Dead Market Check
     if not config.MAKER_ALLOW_DEAD_MARKETS:
-        if y_bid == 0 or n_bid == 0: return
+        if y_bid == 0 or n_bid == 0: return "dead"
 
     # LIQUIDITY DEPTH CHECK
     y_depth = get_liquidity_depth(y_orders, y_bid)
@@ -62,30 +62,26 @@ def check_maker_opportunity(market, obs):
     max_depth = getattr(config, 'MAKER_MAX_QUEUE_DEPTH_USD', 500)
     
     if y_depth > max_depth or n_depth > max_depth:
-        # Don't log this to keep console clean, just skip
-        return
-    total_liquidity = y_depth + n_depth
+        return "depth"
     
+    total_liquidity = y_depth + n_depth
     min_liq = getattr(config, 'MIN_LIQUIDITY_USD', 10.0)
-    if total_liquidity < min_liq:
-        # Silently skip thin markets to avoid spamming console
-        return
+    if total_liquidity < min_liq: return "liq"
 
     current_implied_cost = y_bid + n_bid
-    
-    # Profit = 1.00 - Cost
     potential_profit_pct = (1.0 - current_implied_cost) * 100
     
     if potential_profit_pct >= config.MAKER_MIN_PROFIT_PCT:
         print_maker_alert(question, current_implied_cost, potential_profit_pct, y_bid, n_bid, slug, total_liquidity)
-        
-        # TRIGGER EXECUTION
         try:
-            # Use size from arguments or config
             size = getattr(config, 'CURRENT_RUN_SIZE', config.MAKER_TRADE_SIZE_USD)
             executor.place_maker_orders(market, y_bid, n_bid, size_usd=size)
+            return "success"
         except Exception as e:
             print(f"❌ EXECUTION CRASHED: {e}")
+            return "error"
+    
+    return "profit"
 
 def print_maker_alert(q, cost, profit, y_bid, n_bid, slug, liquidity):
     alert_text = f"\n[{datetime.now().strftime('%H:%M:%S')}] [MAKER-GEN] 🐢 SLOW SPREAD FOUND!\n"
@@ -120,6 +116,10 @@ def main():
     MARKET_REFRESH_SEC = getattr(config, 'MARKET_REFRESH_SEC', 600)
     last_hedge_check = 0
     HEDGE_CHECK_INTERVAL = getattr(config, 'HEDGE_CHECK_INTERVAL_SEC', 30)
+    last_heartbeat = time.time()
+    
+    # Trackers for the heartbeat
+    stats = {"scanned": 0, "skip_vol": 0, "skip_depth": 0, "skip_profit": 0}
 
     while True:
         try:
@@ -157,7 +157,21 @@ def main():
             for market in cached_markets:
                 obs = poly.get_market_orderbooks(market)
                 if obs:
-                    check_maker_opportunity(market, obs)
+                    status = check_maker_opportunity(market, obs)
+                    stats["scanned"] += 1
+                    if status == "depth": stats["skip_depth"] += 1
+                    elif status == "profit": stats["skip_profit"] += 1
+                else:
+                    stats["skip_vol"] += 1 # Or API error
+            
+            # 3. HEARTBEAT: Show the user we are alive
+            if now - last_heartbeat > 60:
+                h_time = datetime.now().strftime('%H:%M:%S')
+                print(f"[{h_time}] ❤️ Heartbeat: Scanned {stats['scanned']} markets. "
+                      f"(Depth Skip: {stats['skip_depth']}, No Profit: {stats['skip_profit']})")
+                # Reset stats for next minute
+                stats = {"scanned": 0, "skip_vol": 0, "skip_depth": 0, "skip_profit": 0}
+                last_heartbeat = now
             
             if args.once: break
             
