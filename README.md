@@ -54,7 +54,7 @@ Modify this file to adjust your risk profile:
 
 ---
 
-## ☁️ Deployment on VM (92.5.20.42)
+## ☁️ Deployment on VM (130.61.103.179)
 
 ### 🔄 Updating to Latest Version
 Run these commands to pull changes and restart the bots:
@@ -106,4 +106,23 @@ pgrep -af python
 After a run, you can analyze your `opportunities.log` to see theoretical performance:
 ```bash
 python3 analyze_logs.py
+
+### Handling VM IP Address Changes
+
+When the VM's IP address changes, you may encounter SSH host key verification failures. Follow these steps to resolve:
+
+1. Remove the old host key:
+   ```bash
+   ssh-keygen -R <old_ip>
+   ```
+
+2. Add the new host key:
+   ```bash
+   ssh-keyscan <new_ip> >> ~/.ssh/known_hosts
+   ```
+
+3. Alternatively, connect with automatic acceptance:
+   ```bash
+   ssh -o StrictHostKeyChecking=accept-new -i <key_path> <user>@<new_ip>
+   ```
 ```
