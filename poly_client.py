@@ -13,6 +13,16 @@ CLOB_API_URL = "https://clob.polymarket.com"
 class PolyClient:
     def __init__(self):
         self.session = requests.Session()
+        # STEALTH: Mimic a real Chrome browser to avoid Cloudflare 403 blocks
+        self.session.headers.update({
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "application/json, text/plain, */*",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Origin": "https://polymarket.com",
+            "Referer": "https://polymarket.com/",
+            "Cache-Control": "no-cache",
+            "Pragma": "no-cache"
+        })
         self._last_429_time = 0
 
     def _request_with_retries(self, url, params=None, timeout=10):
