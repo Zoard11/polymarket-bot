@@ -113,18 +113,39 @@ class TradeExecutor:
             no_token = tids[1]
 
             # Prepare Orders
-            orders = [
-                OrderArgs(price=float(f"{y_bid:.3f}"), size=int(shares_yes), side="BUY", token_id=yes_token),
-                OrderArgs(price=float(f"{n_bid:.3f}"), size=int(shares_no), side="BUY", token_id=no_token)
-            ]
+            order_yes = OrderArgs(price=float(f"{y_bid:.3f}"), size=int(shares_yes), side="BUY", token_id=yes_token)
+            order_no = OrderArgs(price=float(f"{n_bid:.3f}"), size=int(shares_no), side="BUY", token_id=no_token)
 
-            print(f"[{timestamp}] ⚠️ Submitting REAL orders to Polymarket...")
-            for order in orders:
-                resp = self.clob.create_order(order)
-                if resp.get('success'):
-                    print(f"[{timestamp}] ✅ Order Submitted: {order.side} {order.size} @ {order.price} for {order.token_id[:10]}...")
-                else:
-                    print(f"[{timestamp}] ❌ Order Rejected: {resp.get('error') or resp}")
+            print(f"[{timestamp}] ⚠️ Submitting Order A (YES)...")
+            resp_a = self.clob.create_order(order_yes)
+            
+            if not resp_a.get('success'):
+                print(f"[{timestamp}] ❌ Order A (YES) Failed: {resp_a.get('error') or resp_a}")
+                print(f"[{timestamp}] ✋ Order B (NO) was NOT attempted for safety.")
+                return
+
+            order_id_a = resp_a.get('orderID')
+            print(f"[{timestamp}] ✅ Order A (YES) Submitted: ID {order_id_a}")
+
+            print(f"[{timestamp}] ⚠️ Submitting Order B (NO)...")
+            resp_b = self.clob.create_order(order_no)
+
+            if not resp_b.get('success'):
+                error_msg = resp_b.get('error') or resp_b
+                print(f"[{timestamp}] ❌ Order B (NO) Failed: {error_msg}")
+                print(f"[{timestamp}] 🔄 INITIATING ROLLBACK: Attempting to cancel Order A...")
+                
+                try:
+                    cancel_resp = self.clob.cancel(order_id_a)
+                    if cancel_resp and cancel_resp.get('canceled'):
+                        print(f"[{timestamp}] 🛡️ ROLLBACK SUCCESSFUL: Order A ({order_id_a}) was cancelled.")
+                    else:
+                        print(f"[{timestamp}] 🚨 ROLLBACK FAILED: Order A might have filled! UNHEDGED EXPOSURE DETECTED.")
+                except Exception as ex:
+                    print(f"[{timestamp}] 🚨 ROLLBACK CRASHED: {ex}. UNHEDGED EXPOSURE DETECTED.")
+            else:
+                print(f"[{timestamp}] ✅ Order B (NO) Submitted: ID {resp_b.get('orderID')}")
+                print(f"[{timestamp}] 🎉 SUCCESS: Hedge cycle complete (YES + NO balanced).")
 
         except Exception as e:
             print(f"[{timestamp}] ❌ Order Execution Failed: {e}")
