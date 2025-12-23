@@ -56,7 +56,7 @@ HEDGE_CHASER_ENABLED = True        # If True, bot will market-buy the missing si
 HEDGE_TIMEOUT_SEC = 120            # Wait 2 minutes (Golden Middle) before "chasing" a partial fill
 HEDGE_CHECK_INTERVAL_SEC = 30      # How often to check order status
 MAX_CHASE_PRICE = 0.99             # Never pay more than 0.99 to close a hedge (Safety Cap)
-MAKER_ORDER_STALE_SEC = 1200       # Cancel completely unfilled trades after 20 minutes to rotate capital
+MAKER_ORDER_STALE_SEC = 600        # Cancel completely unfilled trades after 10 minutes to rotate capital
 
 # HFT / WebSocket Settings
 WS_ENABLED = True
