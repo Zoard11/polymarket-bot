@@ -114,8 +114,11 @@ class TradeExecutor:
 
             # Immediate Order Placement (Prioritize Speed)
             order_yes = OrderArgs(price=float(f"{y_bid:.3f}"), size=int(shares_yes), side="BUY", token_id=yes_token)
-            # Switch to create_and_post_order: Signs AND submits in one call
-            resp_a = self.clob.create_and_post_order(order_yes, OrderType.GTC)
+            # Immediate Order Placement (Prioritize Speed)
+            # STEP 1: Create and Sign locally
+            signed_yes = self.clob.create_order(order_yes)
+            # STEP 2: Post to exchange
+            resp_a = self.clob.post_order(signed_yes, OrderType.GTC)
             
             if not resp_a.get('success'):
                 err = resp_a.get('errorMsg') or resp_a.get('error')
@@ -124,7 +127,11 @@ class TradeExecutor:
 
             order_id_a = resp_a.get('orderID')
             order_no = OrderArgs(price=float(f"{n_bid:.3f}"), size=int(shares_no), side="BUY", token_id=no_token)
-            resp_b = self.clob.create_and_post_order(order_no, OrderType.GTC)
+            
+            # STEP 1: Create and Sign locally
+            signed_no = self.clob.create_order(order_no)
+            # STEP 2: Post to exchange
+            resp_b = self.clob.post_order(signed_no, OrderType.GTC)
 
             # LOGGING (Done AFTER orders are sent to reduce latency)
             print(f"\n[{timestamp}] 🚀 [LIVE EXECUTION] {market.get('question')[:50]}...")
