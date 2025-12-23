@@ -5,7 +5,8 @@ from dotenv import load_dotenv
 
 def test_ip_health():
     load_dotenv()
-    url = "https://clob.polymarket.com/book?token_id=21742484370710649539304383416410403714521743048924080186523956424911046927508"
+    # Using a more generic endpoint that should always exist (sampling of all prices)
+    url = "https://clob.polymarket.com/sampling"
     
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
