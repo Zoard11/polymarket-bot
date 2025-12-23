@@ -2,6 +2,7 @@ import requests
 import time
 import json
 import concurrent.futures
+from datetime import datetime
 import config
 from ws_client import poly_ws
 
@@ -12,16 +13,23 @@ CLOB_API_URL = "https://clob.polymarket.com"
 class PolyClient:
     def __init__(self):
         self.session = requests.Session()
+        self._last_429_time = 0
 
     def _request_with_retries(self, url, params=None, timeout=10):
+        # Silent Backoff Check
+        backoff_sec = getattr(config, 'REST_BACKOFF_SEC', 30)
+        if time.time() - self._last_429_time < backoff_sec:
+            return None # Still in cooling period
+            
         for i in range(config.API_MAX_RETRIES):
             try:
                 resp = self.session.get(url, params=params, timeout=timeout)
                 if resp.status_code == 200:
                     return resp
                 if resp.status_code == 429:
-                    print(f"Rate limit (429) hit on {url}. Waiting 30s...")
-                    time.sleep(30)
+                    print(f"[{datetime.now().strftime('%H:%M:%S')}] 🛑 API Rate Limit (429). Cooling off for {backoff_sec}s...")
+                    self._last_429_time = time.time()
+                    return None # Immediate silent mode trigger
                 else:
                     time.sleep(config.API_RETRY_DELAY)
             except Exception as e:

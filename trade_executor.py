@@ -114,22 +114,25 @@ class TradeExecutor:
 
             # Immediate Order Placement (Prioritize Speed)
             order_yes = OrderArgs(price=float(f"{y_bid:.3f}"), size=int(shares_yes), side="BUY", token_id=yes_token)
-            resp_a = self.clob.create_order(order_yes)
+            # Switch to create_and_post_order: Signs AND submits in one call
+            resp_a = self.clob.create_and_post_order(order_yes, OrderType.GTC)
             
             if not resp_a.get('success'):
-                logger.error(f"[{timestamp}] ❌ Order A Fail: {resp_a.get('error')}")
+                err = resp_a.get('errorMsg') or resp_a.get('error')
+                logger.error(f"[{timestamp}] ❌ Order A Fail: {err}")
                 return
 
             order_id_a = resp_a.get('orderID')
             order_no = OrderArgs(price=float(f"{n_bid:.3f}"), size=int(shares_no), side="BUY", token_id=no_token)
-            resp_b = self.clob.create_order(order_no)
+            resp_b = self.clob.create_and_post_order(order_no, OrderType.GTC)
 
             # LOGGING (Done AFTER orders are sent to reduce latency)
             print(f"\n[{timestamp}] 🚀 [LIVE EXECUTION] {market.get('question')[:50]}...")
             print(f"[{timestamp}] ✅ YES Submitted: {order_id_a}")
             
             if not resp_b.get('success'):
-                print(f"[{timestamp}] ❌ NO Failed. 🔄 INITIATING ROLLBACK...")
+                err_b = resp_b.get('errorMsg') or resp_b.get('error')
+                print(f"[{timestamp}] ❌ NO Failed: {err_b}. 🔄 INITIATING ROLLBACK...")
                 try:
                     self.clob.cancel(order_id_a)
                     print(f"[{timestamp}] 🛡️ ROLLBACK SUCCESSFUL.")

@@ -34,6 +34,7 @@ HIGH_VOL_PROFIT_BUFFER = 0.5       # Add 0.5% buffer to threshold for high-vol m
 # Robustness
 API_MAX_RETRIES = 3
 API_RETRY_DELAY = 5                # Seconds between retries
+REST_BACKOFF_SEC = 30              # Silent cooling period after 429 errors
 
 # Scanner Settings
 MIN_VOLUME_24H = 10000             # Minimum 24h volume for standard markets
