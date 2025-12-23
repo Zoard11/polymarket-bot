@@ -23,6 +23,8 @@ MIN_MARKET_AGE_HOURS = 1           # Avoid brand new, ultra-volatile markets
 KELLY_FRACTION = 0.2               # Use 20% of the recommended Kelly size (Conservative Fractional Kelly)
 MAX_EVENT_EXPOSURE_USD = 2500      # Cumulative exposure across all platforms for one event
 STARTING_BANKROLL_USD = 45.0       # Your starting capital. RiskManager will prevent overexposure.
+MAX_SESSION_DRAWDOWN_USD = 10.0    # Stop trading if $10 lost in one session (Emergency Brake)
+MIN_LIQUIDITY_USD = 15.0           # Min depth at bid price to avoid slippage (Total across targets)
 
 # Statistical Modeling / Volatility
 # Adjust profit threshold based on 24h volume/volatility proxies

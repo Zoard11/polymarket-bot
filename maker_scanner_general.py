@@ -33,18 +33,38 @@ def get_best_bid(order_list):
     if not prices: return 0.0
     return max(prices)
 
+def get_liquidity_depth(order_list, best_p):
+    """Calculate total USD depth at the best bid price."""
+    if not order_list or not best_p: return 0.0
+    # Sum up USD size of all orders at the best price
+    depth = sum(float(o.get('size', 0)) * best_p for o in order_list if parse_p(o.get('price')) == best_p)
+    return depth
+
 def check_maker_opportunity(market, obs):
     if not obs: return
     question = market.get('question', 'Unknown')
     slug = market.get('slug', '')
     
-    # Get Best Bids
-    y_bid = get_best_bid(obs.get('yes', {}).get('bids', []))
-    n_bid = get_best_bid(obs.get('no', {}).get('bids', []))
+    # Get Bids
+    y_orders = obs.get('yes', {}).get('bids', [])
+    n_orders = obs.get('no', {}).get('bids', [])
+    
+    y_bid = get_best_bid(y_orders)
+    n_bid = get_best_bid(n_orders)
     
     # Dead Market Check
     if not config.MAKER_ALLOW_DEAD_MARKETS:
         if y_bid == 0 or n_bid == 0: return
+
+    # LIQUIDITY DEPTH CHECK (New! Based on feedback)
+    y_depth = get_liquidity_depth(y_orders, y_bid)
+    n_depth = get_liquidity_depth(n_orders, n_bid)
+    total_liquidity = y_depth + n_depth
+    
+    min_liq = getattr(config, 'MIN_LIQUIDITY_USD', 10.0)
+    if total_liquidity < min_liq:
+        # Silently skip thin markets to avoid spamming console
+        return
 
     current_implied_cost = y_bid + n_bid
     
@@ -52,7 +72,7 @@ def check_maker_opportunity(market, obs):
     potential_profit_pct = (1.0 - current_implied_cost) * 100
     
     if potential_profit_pct >= config.MAKER_MIN_PROFIT_PCT:
-        print_maker_alert(question, current_implied_cost, potential_profit_pct, y_bid, n_bid, slug)
+        print_maker_alert(question, current_implied_cost, potential_profit_pct, y_bid, n_bid, slug, total_liquidity)
         
         # TRIGGER EXECUTION
         try:
@@ -62,11 +82,11 @@ def check_maker_opportunity(market, obs):
         except Exception as e:
             print(f"❌ EXECUTION CRASHED: {e}")
 
-def print_maker_alert(q, cost, profit, y_bid, n_bid, slug):
+def print_maker_alert(q, cost, profit, y_bid, n_bid, slug, liquidity):
     alert_text = f"\n[{datetime.now().strftime('%H:%M:%S')}] [MAKER-GEN] 🐢 SLOW SPREAD FOUND!\n"
     alert_text += f"Market: {q}\n"
     alert_text += f"Current Bids: YES {y_bid:.2f} + NO {n_bid:.2f} = {cost:.2f}\n"
-    alert_text += f"Spread Profit: {profit:.2f}% (Limit Order Opportunity)\n"
+    alert_text += f"Spread Profit: {profit:.2f}% | Depth: ${liquidity:.2f}\n"
     alert_text += f"Link: https://polymarket.com/event/{slug}\n"
     alert_text += "-" * 40 + "\n"
     print(alert_text)

@@ -20,24 +20,35 @@ class RiskManager:
         self.total_trades = 0
         self.total_capital_locked = 0.0
         self.starting_bankroll = starting_bankroll_usd or getattr(config, 'STARTING_BANKROLL_USD', 50.0)
+        self.realized_pnl = 0.0     # Tracks actual wins/losses
+        self.is_halted = False     # Emergency stop flag
         
     def can_add_position(self, event_id, market_id, amount_usd):
         """Check if adding this position exceeds any risk limits."""
-        
+        if self.is_halted:
+            return False, "Strategy HALTED due to risk/drawdown limits."
+
         # 1. Total concurrent trades limit
         if self.total_trades >= config.MAX_TOTAL_OPEN_TRADES:
             return False, f"Max concurrent trades ({config.MAX_TOTAL_OPEN_TRADES}) reached."
             
-        # 2. Bankroll / Capital Limit (New!)
+        # 2. Bankroll / Capital Limit
         if self.total_capital_locked + amount_usd > self.starting_bankroll:
             return False, f"Insufficient capital (${self.total_capital_locked + amount_usd:.2f} > ${self.starting_bankroll:.2f} bankroll)."
+
+        # 3. Drawdown Check (New!)
+        # Pause if realized P&L drops below a certain threshold
+        max_drawdown = getattr(config, 'MAX_SESSION_DRAWDOWN_USD', 10.0)
+        if self.realized_pnl < -max_drawdown:
+            self.is_halted = True
+            return False, f"Max drawdown reached (-${abs(self.realized_pnl):.2f}). Stopping for safety."
             
-        # 3. Per-market exposure limit
+        # 4. Per-market exposure limit
         current_m_exp = self.market_exposure.get(market_id, 0)
         if current_m_exp + amount_usd > config.MAX_EXPOSURE_PER_MARKET_USD:
             return False, f"Market exposure limit exceeded."
             
-        # 4. Per-event exposure limit (Correlation Risk)
+        # 5. Per-event exposure limit (Correlation Risk)
         current_e_exp = self.event_exposure.get(event_id, 0)
         if current_e_exp + amount_usd > config.MAX_EVENT_EXPOSURE_USD:
             return False, f"Event correlation limit exceeded."
