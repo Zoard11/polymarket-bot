@@ -56,9 +56,14 @@ def check_maker_opportunity(market, obs):
     if not config.MAKER_ALLOW_DEAD_MARKETS:
         if y_bid == 0 or n_bid == 0: return
 
-    # LIQUIDITY DEPTH CHECK (New! Based on feedback)
+    # LIQUIDITY DEPTH CHECK
     y_depth = get_liquidity_depth(y_orders, y_bid)
     n_depth = get_liquidity_depth(n_orders, n_bid)
+    max_depth = getattr(config, 'MAKER_MAX_QUEUE_DEPTH_USD', 500)
+    
+    if y_depth > max_depth or n_depth > max_depth:
+        # Don't log this to keep console clean, just skip
+        return
     total_liquidity = y_depth + n_depth
     
     min_liq = getattr(config, 'MIN_LIQUIDITY_USD', 10.0)
@@ -129,6 +134,8 @@ def main():
             if not cached_markets or (now - last_market_refresh > MARKET_REFRESH_SEC):
                 print(f"[{datetime.now().strftime('%H:%M:%S')}] 🔄 Refreshing market list from Gamma API...")
                 cached_markets = poly.fetch_active_markets(limit=config.MAX_P_MARKETS)
+                # PRIORITY SORT: Sort by volume descending so we check "Hot" markets first
+                cached_markets.sort(key=lambda x: float(x.get('volume24hr', 0)), reverse=True)
                 last_market_refresh = now
                 
                 # Subscribe to WebSocket for all market tokens

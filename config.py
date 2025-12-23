@@ -38,7 +38,7 @@ REST_BACKOFF_SEC = 30              # Silent cooling period after 429 errors
 REST_COOLDOWN_LONG_SEC = 300       # 5-minute deep cooling for 403 blocks
 
 # Scanner Settings
-MIN_VOLUME_24H = 10000             # Minimum 24h volume for standard markets
+MIN_VOLUME_24H = 50000             # Minimum 24h volume to ensure active trading
 MAX_P_MARKETS = 200                # Max Polymarket events to fetch per cycle
 POLL_INTERVAL_POLY = 15            # Seconds between Polymarket scans
 HF_KEYWORDS = ["Up or Down", "15m", "15-minute"] # Keywords to force-include regardless of volume
@@ -49,6 +49,7 @@ MAKER_TRADE_SIZE_USD = 10.0        # Total per cycle ($5 YES + $5 NO to meet exc
 MAKER_MIN_PROFIT_PCT = 1.0         # Minimum spread profit to trigger alert (e.g. 1.0%)
 MAKER_ALLOW_DEAD_MARKETS = False   # If True, allows markets with 0 bids (Cost=0) -> 100% spread
 MAKER_MIN_SIDE_PRICE = 0.01        # Minimum bid on EACH side to consider market "Alive"
+MAKER_MAX_QUEUE_DEPTH_USD = 500    # If >$500 in bids at same price, skip (too long line)
 LIVE_TRADING = True                # SET TO TRUE FOR REAL ORDER PLACEMENT
 
 # Hedge Chaser Settings (Delta Risk Protection)

@@ -51,7 +51,9 @@ class PolyClient:
                 time.sleep(config.API_RETRY_DELAY)
         return None
 
-    def fetch_active_markets(self, min_volume=10000, limit=100):
+    def fetch_active_markets(self, min_volume=None, limit=100):
+        if min_volume is None:
+            min_volume = getattr(config, 'MIN_VOLUME_24H', 10000)
         url = f"{GAMMA_API_URL}/markets"
         params = {
             "closed": "false",
