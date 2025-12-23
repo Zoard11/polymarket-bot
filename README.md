@@ -71,16 +71,39 @@ One-liner:
 cd ~/polymarket-bot && git fetch origin && git reset --hard origin/main && chmod +x start_bot.sh && ./start_bot.sh
 ```
 
-### � Viewing Logs
-```bash
-# Unified Opportunities
-tail -f ~/polymarket-bot/opportunities.log
+### 🔍 Monitoring & Logging
+The bot is optimized for high-frequency scanning (10Hz). Use these commands to monitor performance on your VM:
 
-# Specific Logs
-tail -f poly.log
-tail -f maker_gen.log
+#### 1. Real-Time Activity (See everything)
+```bash
+tail -f ~/polymarket-bot/maker_gen.log
 ```
 
-### 📊 Monitoring Results
-1.  **Scan Logic**: `tail -f poly.log` / `tail -f cross.log`
-2.  **Verified Hits**: `tail -f opportunities.log` (Clean list of all identified arbs)
+#### 2. Filter for Real Trades (Live Only)
+Search the logs for successful order submissions:
+```bash
+grep -E "Submitted|SUCCESS|Hedge complete" ~/polymarket-bot/maker_gen.log
+```
+
+#### 3. Track Profit Opportunities
+See all spreads found, regardless of whether a trade was placed:
+```bash
+tail -f ~/polymarket-bot/opportunities.log
+```
+
+#### 4. Debugging & Errors
+Check if the bot is hitting rate limits or connection issues:
+```bash
+grep -i "error\|warn\|fail" ~/polymarket-bot/maker_gen.log
+```
+
+#### 5. Verify Bot is Running
+```bash
+pgrep -af python
+```
+
+### 📊 Performance Summary
+After a run, you can analyze your `opportunities.log` to see theoretical performance:
+```bash
+python3 analyze_logs.py
+```
