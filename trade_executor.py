@@ -101,6 +101,11 @@ class TradeExecutor:
             print(f"[{timestamp}] 🛡️ RISK GATE: Trade blocked - {reason}")
             return
 
+        # MARKET DE-DUPLICATION: Don't open a second hedge on the same market
+        if any(p['market_id'] == market_id for p in self.hedge_pairs):
+            print(f"[{timestamp}] 🛡️ DUPLICATE GATE: Already have a pending hedge for this market.")
+            return
+
         # EXECUTE REAL TRADES (Optimized for Speed)
         if not self.clob:
             print(f"[{timestamp}] ❌ Error: CLOB Client not initialized.")

@@ -17,7 +17,7 @@ MIN_TRADE_SIZE_USD = 5.0      # Safety floor for reliable Polymarket CLOB execut
                               # by the exchange depending on the specific market's 'min_size'.
 
 # Risk Management
-MAX_EXPOSURE_PER_MARKET_USD = 1000  # Cap on total position size
+MAX_EXPOSURE_PER_MARKET_USD = 11.0   # Cap at ONE trade size per market to ensure diversity
 MAX_TOTAL_OPEN_TRADES = 4          # Number of concurrent arbs (Adjusted for $45 bankroll)
 MIN_MARKET_AGE_HOURS = 1           # Avoid brand new, ultra-volatile markets
 KELLY_FRACTION = 0.2               # Use 20% of the recommended Kelly size (Conservative Fractional Kelly)
