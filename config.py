@@ -22,6 +22,7 @@ MAX_TOTAL_OPEN_TRADES = 4          # Number of concurrent arbs (Adjusted for $45
 MIN_MARKET_AGE_HOURS = 1           # Avoid brand new, ultra-volatile markets
 KELLY_FRACTION = 0.2               # Use 20% of the recommended Kelly size (Conservative Fractional Kelly)
 MAX_EVENT_EXPOSURE_USD = 2500      # Cumulative exposure across all platforms for one event
+STARTING_BANKROLL_USD = 45.0       # Your starting capital. RiskManager will prevent overexposure.
 
 # Statistical Modeling / Volatility
 # Adjust profit threshold based on 24h volume/volatility proxies

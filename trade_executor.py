@@ -7,6 +7,7 @@ from eth_account import Account
 from py_clob_client.client import ClobClient, ApiCreds
 from py_clob_client.constants import POLYGON
 from py_clob_client.clob_types import OrderArgs, OrderType
+from risk_manager import risk_manager
 
 # Setup specific logger for trades
 logger = logging.getLogger('executor')
@@ -87,6 +88,14 @@ class TradeExecutor:
             print(f"[{timestamp}] 🛑 ACTUAL TRADING DISABLED (Config.LIVE_TRADING = False)\n")
             return
 
+        # RISK MANAGER GATE: Check if we have capital and are within limits
+        market_id = market.get('conditionId') or market.get('id')
+        event_id = market.get('event_slug') or market.get('slug') or 'unknown'
+        can_trade, reason = risk_manager.can_add_position(event_id, market_id, size_usd)
+        if not can_trade:
+            print(f"[{timestamp}] 🛡️ RISK GATE: Trade blocked - {reason}")
+            return
+
         # EXECUTE REAL TRADES (Optimized for Speed)
         if not self.clob:
             print(f"[{timestamp}] ❌ Error: CLOB Client not initialized.")
@@ -128,6 +137,8 @@ class TradeExecutor:
             else:
                 print(f"[{timestamp}] ✅ NO Submitted: {resp_b.get('orderID')}")
                 print(f"[{timestamp}] 🎉 SUCCESS: Hedge complete.\n")
+                # Record successful trade in RiskManager for capital tracking
+                risk_manager.record_trade(event_id, market_id, size_usd)
 
         except Exception as e:
             print(f"[{timestamp}] ❌ Execution Error: {e}")
