@@ -23,7 +23,8 @@ class TradeExecutor:
     def __init__(self, poly_client=None):
         self.poly = poly_client  # Standard HTTP/Gamma Client
         self.clob = None         # Authenticated L2 Client
-        self.active_orders = {}  # Track open orders
+        self.active_orders = {}  # Format: {order_id: {"market": m, "side": s, ...}}
+        self.hedge_pairs = []    # Format: [{"yes_id": id1, "no_id": id2, "market": m, "time": t, "size": s}]
         self._init_clob()
 
     def _init_clob(self):
@@ -145,14 +146,91 @@ class TradeExecutor:
                     print(f"[{timestamp}] 🛡️ ROLLBACK SUCCESSFUL.")
                 except Exception: print(f"[{timestamp}] 🚨 ROLLBACK FAILED!")
             else:
-                print(f"[{timestamp}] ✅ NO Submitted: {resp_b.get('orderID')}")
-                print(f"[{timestamp}] 🎉 SUCCESS: Hedge complete.\n")
+                # Record for Hedge Chaser
+                self.hedge_pairs.append({
+                    "yes_id": order_id_a,
+                    "no_id": resp_b.get('orderID'),
+                    "yes_token": yes_token,
+                    "no_token": no_token,
+                    "size_yes": shares_yes,
+                    "size_no": shares_no,
+                    "timestamp": datetime.now(),
+                    "market_question": market.get('question'),
+                    "chased": False
+                })
+
                 # Record successful trade in RiskManager for capital tracking
                 risk_manager.record_trade(event_id, market_id, size_usd)
 
-        except Exception as e:
-            err_str = str(e)
-            print(f"[{timestamp}] ❌ Execution Error: {err_str}")
-            if "403" in err_str or "blocked" in err_str.lower():
-                print(f"[{timestamp}] 🚨 CRITICAL: CLOUDFLARE BLOCK DETECTED. HALTING STRATEGY.")
-                risk_manager.is_halted = True
+    def check_and_chase_hedges(self):
+        """
+        Loops through active hedge pairs. If one side is filled and the other isn't 
+        (after timeout), it cancels the bid and market-buys the missing side.
+        """
+        if not self.clob or not self.hedge_pairs:
+            return
+
+        import time
+        now = datetime.now()
+        timeout = getattr(config, 'HEDGE_TIMEOUT_SEC', 300)
+        
+        remaining_pairs = []
+        for pair in self.hedge_pairs:
+            if pair.get('chased'): continue
+            
+            try:
+                # 1. Check Status of both orders
+                status_a = self.clob.get_order(pair['yes_id'])
+                status_b = self.clob.get_order(pair['no_id'])
+                
+                # Check if both are completely filled
+                fill_a = float(status_a.get('size_matched', 0)) >= float(status_a.get('original_size', 0))
+                fill_b = float(status_b.get('size_matched', 0)) >= float(status_b.get('original_size', 0))
+
+                if fill_a and fill_b:
+                    logger.info(f"✅ Hedge Fully Filled: {pair['market_question'][:30]}")
+                    continue # Successfully closed!
+
+                # 2. Check for "Hanging" state (One filled, one not) after timeout
+                pair_age = (now - pair['timestamp']).total_seconds()
+                
+                if pair_age > timeout:
+                    target_id = None
+                    target_token = None
+                    target_size = None
+                    side_name = ""
+
+                    if fill_a and not fill_b:
+                        target_id, target_token, target_size, side_name = pair['no_id'], pair['no_token'], pair['size_no'], "NO"
+                    elif fill_b and not fill_a:
+                        target_id, target_token, target_size, side_name = pair['yes_id'], pair['yes_token'], pair['size_yes'], "YES"
+
+                    if target_id:
+                        logger.warning(f"⚠️ HEDGE HANGING! ({int(pair_age)}s) Chasing {side_name} for '{pair['market_question'][:30]}'")
+                        
+                        # STEP 1: Cancel the hanging Limit Order
+                        try: self.clob.cancel(target_id)
+                        except: pass
+                        
+                        # STEP 2: Place a MARKET ORDER (Aggressive Taker) to close the gap
+                        # We use a very high/low price to ensure immediate fill (taking the book)
+                        chase_price = 0.99 if side_name == "YES" else 0.99
+                        # Technically the CLOB API 'create_market_order' handles this better
+                        # but we use a marketable limit order for safety if FOK isn't available
+                        chase_args = OrderArgs(price=0.99, size=int(target_size), side="BUY", token_id=target_token)
+                        signed_chase = self.clob.create_order(chase_args)
+                        resp = self.clob.post_order(signed_chase)
+                        
+                        if resp.get('success'):
+                            logger.info(f"🛡️ CHASE SUCCESSFUL: {side_name} filled via Market Order.")
+                            pair['chased'] = True
+                            continue
+                        else:
+                            logger.error(f"🚨 CHASE FAILED: {resp.get('errorMsg')}")
+
+                remaining_pairs.append(pair)
+            except Exception as e:
+                logger.error(f"❌ Error checking hedge pair: {e}")
+                remaining_pairs.append(pair)
+
+        self.hedge_pairs = remaining_pairs

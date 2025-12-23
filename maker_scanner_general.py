@@ -111,12 +111,18 @@ def main():
     print("🚀 Speed-Optimized Maker Strategy Scanner (WebSocket-First) Started...")
     
     cached_markets = []
-    last_market_refresh = 0
-    MARKET_REFRESH_SEC = 600 # Refresh market list every 10 mins
-    
+    last_hedge_check = 0
+    HEDGE_CHECK_INTERVAL = getattr(config, 'HEDGE_CHECK_INTERVAL_SEC', 30)
+
     while True:
         try:
             now = time.time()
+            
+            # 0. PERIODIC HEDGE CHASER: Check status of pending hedges
+            if config.LIVE_TRADING and (now - last_hedge_check > HEDGE_CHECK_INTERVAL):
+                executor.check_and_chase_hedges()
+                last_hedge_check = now
+
             # 1. Periodically fetch/refresh market list (REST - Slow handled safely)
             if not cached_markets or (now - last_market_refresh > MARKET_REFRESH_SEC):
                 print(f"[{datetime.now().strftime('%H:%M:%S')}] 🔄 Refreshing market list from Gamma API...")

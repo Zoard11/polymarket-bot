@@ -1,42 +1,66 @@
 import requests
 import json
 import os
+import time
 from dotenv import load_dotenv
 
-def test_ip_health():
+def test_ip_health(trials=5):
     load_dotenv()
-    # Official Health Check Endpoint
-    url = "https://clob.polymarket.com/health"
-    
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     }
     
-    print(f"🔍 Testing IP Health for: {url}")
-    print(f"🛠️ Using User-Agent: {headers['User-Agent']}")
+    print(f"🔍 Testing IP Health (Running {trials} trials for average latency)...")
     
-    try:
-        # Test 1: GET (Scanning)
-        url_get = "https://clob.polymarket.com/book?token_id=1"
-        resp_get = requests.get(url_get, headers=headers, timeout=10)
-        print(f"📡 GET TEST (Scanning): Status {resp_get.status_code}")
-        
-        # Test 2: POST (Trading)
-        # We send a dummy post to the order endpoint to see if the WAF triggers
-        url_post = "https://clob.polymarket.com/order"
-        resp_post = requests.post(url_post, headers=headers, json={"test":True}, timeout=10)
-        print(f"📡 POST TEST (Trading): Status {resp_post.status_code}")
+    latencies_get = []
+    latencies_post = []
+    status_codes_get = set()
+    status_codes_post = set()
 
-        if resp_post.status_code == 403:
-            print("\n❌ VERDICT: Cloudflare is specifically blocking POST (Trading) requests from this IP.")
-            print("   (GET/Scanning is still allowed which is why you see opportunities).")
-        elif resp_get.status_code == 403:
-            print("\n❌ VERDICT: Your IP is COMPLETELY BLOCKED (Both GET and POST).")
-        else:
-            print("\n✅ VERDICT: Your IP appears clean to the WAF. (Unexpected result given the logs).")
+    for i in range(trials):
+        try:
+            # Test 1: GET (Scanning)
+            url_get = "https://clob.polymarket.com/book?token_id=1"
+            start_get = time.time()
+            resp_get = requests.get(url_get, headers=headers, timeout=10)
+            latency_get = (time.time() - start_get) * 1000
+            latencies_get.append(latency_get)
+            status_codes_get.add(resp_get.status_code)
             
-    except Exception as e:
-        print(f"❌ Error during test: {e}")
+            # Test 2: POST (Trading)
+            url_post = "https://clob.polymarket.com/order"
+            start_post = time.time()
+            resp_post = requests.post(url_post, headers=headers, json={"test":True}, timeout=10)
+            latency_post = (time.time() - start_post) * 1000
+            latencies_post.append(latency_post)
+            status_codes_post.add(resp_post.status_code)
+            
+            print(f"   Trial {i+1}: GET {resp_get.status_code} ({latency_get:.1f}ms) | POST {resp_post.status_code} ({latency_post:.1f}ms)")
+            time.sleep(0.5) # Gap between trials
+
+        except Exception as e:
+            print(f"   Trial {i+1}: ❌ Error: {e}")
+
+    if not latencies_get:
+        print("❌ No successful trials.")
+        return
+
+    avg_get = sum(latencies_get) / len(latencies_get)
+    avg_post = sum(latencies_post) / len(latencies_post)
+
+    print(f"\n📊 --- FINAL RESULTS ---")
+    print(f"🌐 Average GET Latency: {avg_get:.1f}ms")
+    print(f"💸 Average POST Latency: {avg_post:.1f}ms")
+
+    if 403 in status_codes_post:
+        print("\n❌ VERDICT: BLOCKED. Your IP is still triggering the 403 WAF block.")
+    elif 401 in status_codes_post or 200 in status_codes_post or 400 in status_codes_post:
+        print("\n✅ VERDICT: CLEAN. Your home IP passed the WAF test (Status 401 means authentication reached).")
+    else:
+        print("\n❓ VERDICT: UNCERTAIN. Unexpected status codes detected.")
+
+if __name__ == "__main__":
+    test_ip_health(trials=5)
 
     # Test with proxy if environment variables are set
     proxy = os.getenv("HTTPS_PROXY")

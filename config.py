@@ -51,6 +51,11 @@ MAKER_ALLOW_DEAD_MARKETS = False   # If True, allows markets with 0 bids (Cost=0
 MAKER_MIN_SIDE_PRICE = 0.01        # Minimum bid on EACH side to consider market "Alive"
 LIVE_TRADING = True                # SET TO TRUE FOR REAL ORDER PLACEMENT
 
+# Hedge Chaser Settings (Delta Risk Protection)
+HEDGE_CHASER_ENABLED = True        # If True, bot will market-buy the missing side of a fill
+HEDGE_TIMEOUT_SEC = 300            # Wait 5 minutes before "chasing" a partial fill
+HEDGE_CHECK_INTERVAL_SEC = 30      # How often to check order status
+
 # HFT / WebSocket Settings
 WS_ENABLED = True
 POLL_INTERVAL_WS = 0.5            # Frequency to check local WS cache (s). 0.5s is safer for Cloudflare.
