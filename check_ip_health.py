@@ -16,18 +16,24 @@ def test_ip_health():
     print(f"🛠️ Using User-Agent: {headers['User-Agent']}")
     
     try:
-        # Test: /book endpoint (This is where the bot got blocked on the VM)
-        # Using a dummy ID to see if we get through the WAF
-        url = "https://clob.polymarket.com/book?token_id=1"
-        resp = requests.get(url, headers=headers, timeout=10)
-        print(f"📡 WAF TEST (/book): Status {resp.status_code}")
+        # Test 1: GET (Scanning)
+        url_get = "https://clob.polymarket.com/book?token_id=1"
+        resp_get = requests.get(url_get, headers=headers, timeout=10)
+        print(f"📡 GET TEST (Scanning): Status {resp_get.status_code}")
         
-        if resp.status_code == 403:
-            print("❌ Status 403: Your IP is still HARD BLOCKED by Cloudflare.")
-        elif resp.status_code in [200, 400, 404]:
-            print("✅ Status Pass: Cloudflare is NOT blocking you (Server returned " + str(resp.status_code) + ").")
+        # Test 2: POST (Trading)
+        # We send a dummy post to the order endpoint to see if the WAF triggers
+        url_post = "https://clob.polymarket.com/order"
+        resp_post = requests.post(url_post, headers=headers, json={"test":True}, timeout=10)
+        print(f"📡 POST TEST (Trading): Status {resp_post.status_code}")
+
+        if resp_post.status_code == 403:
+            print("\n❌ VERDICT: Cloudflare is specifically blocking POST (Trading) requests from this IP.")
+            print("   (GET/Scanning is still allowed which is why you see opportunities).")
+        elif resp_get.status_code == 403:
+            print("\n❌ VERDICT: Your IP is COMPLETELY BLOCKED (Both GET and POST).")
         else:
-            print(f"❓ Unexpected Status: {resp.status_code}")
+            print("\n✅ VERDICT: Your IP appears clean to the WAF. (Unexpected result given the logs).")
             
     except Exception as e:
         print(f"❌ Error during test: {e}")
