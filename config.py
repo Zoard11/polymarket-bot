@@ -35,6 +35,7 @@ HIGH_VOL_PROFIT_BUFFER = 0.5       # Add 0.5% buffer to threshold for high-vol m
 API_MAX_RETRIES = 3
 API_RETRY_DELAY = 5                # Seconds between retries
 REST_BACKOFF_SEC = 30              # Silent cooling period after 429 errors
+REST_COOLDOWN_LONG_SEC = 300       # 5-minute deep cooling for 403 blocks
 
 # Scanner Settings
 MIN_VOLUME_24H = 10000             # Minimum 24h volume for standard markets
@@ -52,6 +53,7 @@ LIVE_TRADING = True                # SET TO TRUE FOR REAL ORDER PLACEMENT
 
 # HFT / WebSocket Settings
 WS_ENABLED = True
+POLL_INTERVAL_WS = 0.5            # Frequency to check local WS cache (s). 0.5s is safer for Cloudflare.
 WS_MAX_AGE_SEC = 10                # Max age of WS data before falling back to REST
 POLL_INTERVAL_WS = 0.1             # Fast 10hz loop for WebSocket cache checking
 POLL_INTERVAL_CORR = 10            # Frequency for correlation/logical scanning

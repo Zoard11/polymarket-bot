@@ -151,4 +151,8 @@ class TradeExecutor:
                 risk_manager.record_trade(event_id, market_id, size_usd)
 
         except Exception as e:
-            print(f"[{timestamp}] ❌ Execution Error: {e}")
+            err_str = str(e)
+            print(f"[{timestamp}] ❌ Execution Error: {err_str}")
+            if "403" in err_str or "blocked" in err_str.lower():
+                print(f"[{timestamp}] 🚨 CRITICAL: CLOUDFLARE BLOCK DETECTED. HALTING STRATEGY.")
+                risk_manager.is_halted = True

@@ -29,7 +29,12 @@ class PolyClient:
                 if resp.status_code == 429:
                     print(f"[{datetime.now().strftime('%H:%M:%S')}] 🛑 API Rate Limit (429). Cooling off for {backoff_sec}s...")
                     self._last_429_time = time.time()
-                    return None # Immediate silent mode trigger
+                    return None
+                if resp.status_code == 403:
+                    long_backoff = getattr(config, 'REST_COOLDOWN_LONG_SEC', 300)
+                    print(f"[{datetime.now().strftime('%H:%M:%S')}] 🛡️ CLOUDFLARE BLOCK (403). DEEP COOLING for {long_backoff}s...")
+                    self._last_429_time = time.time() + (long_backoff - backoff_sec) # Extend the cooling
+                    return None
                 else:
                     time.sleep(config.API_RETRY_DELAY)
             except Exception as e:
