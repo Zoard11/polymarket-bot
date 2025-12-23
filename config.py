@@ -44,7 +44,7 @@ MAKER_TRADE_SIZE_USD = 10.0        # Reliable size (split YES/NO)
 MAKER_MIN_PROFIT_PCT = 1.0         # Minimum spread profit to trigger alert (e.g. 1.0%)
 MAKER_ALLOW_DEAD_MARKETS = False   # If True, allows markets with 0 bids (Cost=0) -> 100% spread
 MAKER_MIN_SIDE_PRICE = 0.01        # Minimum bid on EACH side to consider market "Alive"
-LIVE_TRADING = False               # SAFETY SWITCH: Set to True to enable REAL ORDER PLACEMENT
+LIVE_TRADING = True               # SET TO TRUE FOR REAL ORDER PLACEMENT
 
 # HFT / WebSocket Settings
 WS_ENABLED = True
