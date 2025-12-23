@@ -67,7 +67,7 @@ class TradeExecutor:
         Uses Real API if LIVE_TRADING is True.
         """
         if size_usd is None:
-            size_usd = config.TARGET_TRADE_SIZE_USD
+            size_usd = getattr(config, 'MAKER_TRADE_SIZE_USD', config.TARGET_TRADE_SIZE_USD)
             
         # Check against safety floor
         min_size = getattr(config, 'MIN_TRADE_SIZE_USD', 5.0)
@@ -99,15 +99,32 @@ class TradeExecutor:
             return
 
         try:
-            # TODO: Get Token IDs from Market Object
-            # tokens = json.loads(market['clobTokenIds'])
-            # yes_token = tokens[0]
-            # no_token = tokens[1]
+            # Parse Token IDs from Market Object
+            import json
+            tids = market.get('clobTokenIds')
+            if isinstance(tids, str):
+                tids = json.loads(tids)
             
-            # Need to ensure we have token_ids passed in 'market' object
-             print(f"[{timestamp}] ⚠️ Real Order Placement logic initialized (Submitting...)")
-             # await self.clob.create_order(...) # Pseudo
-             print(f"[{timestamp}] ✅ [REAL] Orders Submitted (Simulated for Safety Phase 1)")
+            if not tids or len(tids) < 2:
+                print(f"[{timestamp}] ❌ Error: Missing Token IDs in market data.")
+                return
+
+            yes_token = tids[0]
+            no_token = tids[1]
+
+            # Prepare Orders
+            orders = [
+                OrderArgs(price=float(f"{y_bid:.3f}"), size=int(shares_yes), side="BUY", token_id=yes_token),
+                OrderArgs(price=float(f"{n_bid:.3f}"), size=int(shares_no), side="BUY", token_id=no_token)
+            ]
+
+            print(f"[{timestamp}] ⚠️ Submitting REAL orders to Polymarket...")
+            for order in orders:
+                resp = self.clob.create_order(order)
+                if resp.get('success'):
+                    print(f"[{timestamp}] ✅ Order Submitted: {order.side} {order.size} @ {order.price} for {order.token_id[:10]}...")
+                else:
+                    print(f"[{timestamp}] ❌ Order Rejected: {resp.get('error') or resp}")
 
         except Exception as e:
             print(f"[{timestamp}] ❌ Order Execution Failed: {e}")

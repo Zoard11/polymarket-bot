@@ -54,8 +54,7 @@ def check_maker_opportunity(market, obs):
     if potential_profit_pct >= config.MAKER_MIN_PROFIT_PCT:
         print_maker_alert(question, current_implied_cost, potential_profit_pct, y_bid, n_bid, slug)
         
-        # TRIGGER EXECUTION (MOCK)
-        print(f"[DEBUG] Triggering TradeExecutor for {slug}...") 
+        # TRIGGER EXECUTION
         try:
             # Use size from arguments or config
             size = getattr(config, 'CURRENT_RUN_SIZE', config.MAKER_TRADE_SIZE_USD)
@@ -85,6 +84,9 @@ def main():
     if args.size:
         print(f"💰 Using custom trade size: ${args.size}")
         config.CURRENT_RUN_SIZE = args.size
+
+    mode_str = "LIVE 🚀" if config.LIVE_TRADING else "MOCK (Dry Run) 🔎"
+    print(f"🛡️  Trading Mode: {mode_str}")
 
     print("🐢 General Maker Strategy Scanner (Wide Net - 200 Markets) Started...")
     
